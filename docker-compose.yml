@@ -1,0 +1,41 @@
+
+services:
+  product-db:
+    build:
+      context: ./services/product-db
+      dockerfile: Dockerfile
+    container_name: product_db_container
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_password
+    volumes:
+      - product_db_data:/var/lib/postgresql/data
+    networks:
+      - distributed_network
+
+  customer-db:
+    build:
+      context: ./services/customer-db
+      dockerfile: Dockerfile
+    container_name: customer_db_container
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: customer_user
+      POSTGRES_PASSWORD: customer_password
+    volumes:
+      - customer_db_data:/var/lib/postgresql/data
+    networks:
+      - distributed_network
+
+volumes:
+  product_db_data:
+  customer_db_data:
+
+networks:
+  distributed_network:
+    driver: bridge
