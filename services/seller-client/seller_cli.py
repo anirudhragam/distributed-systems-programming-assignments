@@ -1,0 +1,298 @@
+#!/usr/bin/env python3
+"""
+Seller-side CLI Client for the Distributed E-commerce System
+Provides interactive menu for sellers to manage their inventory
+"""
+
+import sys
+import os
+from typing import Optional
+from api_client import SellerAPIClient
+from session import SellerSession
+
+class SellerCLI:
+    """Interactive CLI for sellers"""
+    
+    def __init__(self, api_host: str = "localhost", api_port: int = 5000):
+        self.api_client = SellerAPIClient(api_host, api_port)
+        self.session = SellerSession()
+    
+    def display_main_menu(self):
+        """Display main menu for logged-out users"""
+        print("\n" + "="*50)
+        print("SELLER CLIENT - E-Commerce System")
+        print("="*50)
+        print("1. Create Account")
+        print("2. Login")
+        print("3. Exit")
+        print("="*50)
+    
+    def display_authenticated_menu(self):
+        """Display menu for logged-in sellers"""
+        print("\n" + "="*50)
+        print(f"Welcome {self.session.seller_name} (ID: {self.session.seller_id})")
+        print("="*50)
+        print("1. View My Rating")
+        print("2. Register Item for Sale")
+        print("3. Change Item Price")
+        print("4. Update Units for Sale")
+        print("5. Display My Items for Sale")
+        print("6. Logout")
+        print("="*50)
+    
+    def handle_create_account(self):
+        """Handle account creation"""
+        print("\n--- Create Account ---")
+        username = input("Enter username: ").strip()
+        if not username:
+            print("Error: Username cannot be empty")
+            return
+        
+        password = input("Enter password: ").strip()
+        if not password:
+            print("Error: Password cannot be empty")
+            return
+        
+        response = self.api_client.create_account(username, password)
+        
+        if response.get("status") == "success":
+            print(f"✓ {response.get('message')}")
+            print(f"  Your Seller ID: {response.get('seller_id')}")
+        else:
+            print(f"✗ Error: {response.get('message', 'Unknown error')}")
+    
+    def handle_login(self):
+        """Handle seller login"""
+        print("\n--- Login ---")
+        username = input("Enter username: ").strip()
+        if not username:
+            print("Error: Username cannot be empty")
+            return
+        
+        password = input("Enter password: ").strip()
+        if not password:
+            print("Error: Password cannot be empty")
+            return
+        
+        response = self.api_client.login(username, password)
+        
+        if response.get("status") == "success":
+            self.session.session_id = response.get("session_id")
+            self.session.seller_id = response.get("seller_id")
+            self.session.seller_name = response.get("seller_name")
+            self.session.logged_in = True
+            print(f"✓ {response.get('message')}")
+        else:
+            print(f"✗ Error: {response.get('message', 'Login failed')}")
+    
+    def handle_logout(self):
+        """Handle seller logout"""
+        if not self.session.is_logged_in():
+            print("Error: Not logged in")
+            return
+        
+        response = self.api_client.logout(self.session.session_id)
+        
+        if response.get("status") == "success":
+            print(f"✓ {response.get('message')}")
+            self.session.clear()
+        else:
+            print(f"✗ Error: {response.get('message', 'Logout failed')}")
+    
+    def handle_get_rating(self):
+        """Handle get seller rating"""
+        if not self.session.is_logged_in():
+            print("Error: Must be logged in")
+            return
+        
+        response = self.api_client.get_seller_rating(self.session.session_id)
+        
+        if response.get("status") == "success":
+            print("\n--- Your Rating ---")
+            print(f"Thumbs Up: {response.get('thumbs_up')}")
+            print(f"Thumbs Down: {response.get('thumbs_down')}")
+            print(f"Overall Rating: {response.get('rating')}")
+        else:
+            print(f"✗ Error: {response.get('message', 'Could not fetch rating')}")
+    
+    def handle_register_item(self):
+        """Handle item registration"""
+        if not self.session.is_logged_in():
+            print("Error: Must be logged in")
+            return
+        
+        print("\n--- Register Item for Sale ---")
+        
+        try:
+            item_name = input("Item name (max 32 chars): ").strip()
+            if not item_name or len(item_name) > 32:
+                print("Error: Invalid item name")
+                return
+            
+            category = int(input("Category (integer): ").strip())
+            
+            keywords_input = input("Keywords (comma-separated, max 5): ").strip()
+            keywords = [k.strip()[:8] for k in keywords_input.split(",") if k.strip()]
+            if len(keywords) > 5:
+                print("Error: Maximum 5 keywords allowed")
+                return
+            
+            condition = input("Condition (New/Used): ").strip()
+            if condition not in ["New", "Used"]:
+                print("Error: Condition must be 'New' or 'Used'")
+                return
+            
+            sale_price = float(input("Sale price: ").strip())
+            quantity = int(input("Quantity available: ").strip())
+            
+            item_data = {
+                "item_name": item_name,
+                "category": category,
+                "keywords": keywords,
+                "condition": condition,
+                "sale_price": sale_price,
+                "quantity": quantity
+            }
+            
+            response = self.api_client.register_item_for_sale(self.session.session_id, item_data)
+            
+            if response.get("status") == "success":
+                print(f"✓ {response.get('message')}")
+                print(f"  Item ID: {response.get('item_id')}")
+            else:
+                print(f"✗ Error: {response.get('message', 'Could not register item')}")
+        
+        except ValueError as e:
+            print(f"Error: Invalid input - {str(e)}")
+    
+    def handle_change_price(self):
+        """Handle price change"""
+        if not self.session.is_logged_in():
+            print("Error: Must be logged in")
+            return
+        
+        print("\n--- Change Item Price ---")
+        
+        try:
+            item_id = int(input("Item ID: ").strip())
+            new_price = float(input("New price: ").strip())
+            
+            response = self.api_client.change_item_price(self.session.session_id, item_id, new_price)
+            
+            if response.get("status") == "success":
+                print(f"✓ {response.get('message')}")
+                print(f"  Item {item_id} new price: ${response.get('new_price')}")
+            else:
+                print(f"✗ Error: {response.get('message', 'Could not update price')}")
+        
+        except ValueError as e:
+            print(f"Error: Invalid input - {str(e)}")
+    
+    def handle_update_units(self):
+        """Handle units update"""
+        if not self.session.is_logged_in():
+            print("Error: Must be logged in")
+            return
+        
+        print("\n--- Update Units for Sale ---")
+        
+        try:
+            item_id = int(input("Item ID: ").strip())
+            quantity_change = int(input("Quantity change (negative to remove, positive to add): ").strip())
+            
+            response = self.api_client.update_units_for_sale(self.session.session_id, item_id, quantity_change)
+            
+            if response.get("status") == "success":
+                print(f"✓ {response.get('message')}")
+                print(f"  Item {item_id} remaining quantity: {response.get('remaining_quantity')}")
+            else:
+                print(f"✗ Error: {response.get('message', 'Could not update units')}")
+        
+        except ValueError as e:
+            print(f"Error: Invalid input - {str(e)}")
+    
+    def handle_display_items(self):
+        """Handle display items"""
+        if not self.session.is_logged_in():
+            print("Error: Must be logged in")
+            return
+        
+        response = self.api_client.display_items_for_sale(self.session.session_id)
+        
+        if response.get("status") == "success":
+            items = response.get("items", [])
+            
+            if not items:
+                print("\nYou have no items for sale")
+                return
+            
+            print("\n--- Your Items for Sale ---")
+            print(f"Total items: {response.get('total_items')}\n")
+            
+            for item in items:
+                print(f"Item ID: {item['item_id']}")
+                print(f"  Name: {item['item_name']}")
+                print(f"  Category: {item['category']}")
+                print(f"  Condition: {item['condition']}")
+                print(f"  Price: ${item['sale_price']}")
+                print(f"  Quantity: {item['quantity']}")
+                print()
+        else:
+            print(f"✗ Error: {response.get('message', 'Could not fetch items')}")
+    
+    def run(self):
+        """Main CLI loop"""
+        print("\nSeller Client initialized successfully!")
+        print(f"API Server: {self.api_client.host}:{self.api_client.port}")
+        
+        while True:
+            try:
+                if not self.session.is_logged_in():
+                    self.display_main_menu()
+                    choice = input("Enter your choice: ").strip()
+                    
+                    if choice == "1":
+                        self.handle_create_account()
+                    elif choice == "2":
+                        self.handle_login()
+                    elif choice == "3":
+                        print("\nGoodbye!")
+                        break
+                    else:
+                        print("Invalid choice. Please try again.")
+                
+                else:
+                    self.display_authenticated_menu()
+                    choice = input("Enter your choice: ").strip()
+                    
+                    if choice == "1":
+                        self.handle_get_rating()
+                    elif choice == "2":
+                        self.handle_register_item()
+                    elif choice == "3":
+                        self.handle_change_price()
+                    elif choice == "4":
+                        self.handle_update_units()
+                    elif choice == "5":
+                        self.handle_display_items()
+                    elif choice == "6":
+                        self.handle_logout()
+                    else:
+                        print("Invalid choice. Please try again.")
+            
+            except KeyboardInterrupt:
+                print("\n\nExiting...")
+                break
+            except Exception as e:
+                print(f"Error: {str(e)}")
+
+def main():
+    """Entry point"""
+    api_host = os.getenv("API_HOST", "localhost")
+    api_port = int(os.getenv("API_PORT", "5000"))
+    
+    cli = SellerCLI(api_host, api_port)
+    cli.run()
+
+if __name__ == "__main__":
+    main()

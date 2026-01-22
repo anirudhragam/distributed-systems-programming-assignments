@@ -32,6 +32,22 @@ services:
     networks:
       - distributed_network
 
+  seller-client:
+    build:
+      context: ./services/seller-client
+      dockerfile: Dockerfile
+    container_name: seller_client_container
+    depends_on:
+      - product-db
+      - customer-db
+    environment:
+      API_HOST: localhost
+      API_PORT: 5000
+    stdin_open: true
+    tty: true
+    networks:
+      - distributed_network
+
 volumes:
   product_db_data:
   customer_db_data:
