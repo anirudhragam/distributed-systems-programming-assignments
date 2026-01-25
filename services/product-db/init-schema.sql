@@ -2,6 +2,7 @@
 
 CREATE TABLE products (
   item_id SERIAL PRIMARY KEY,
+  seller_id VARCHAR(10) NOT NULL,
   item_name VARCHAR(32) NOT NULL,
   category INTEGER NOT NULL,
   keywords VARCHAR(8)[] DEFAULT ARRAY[]::VARCHAR(8)[],

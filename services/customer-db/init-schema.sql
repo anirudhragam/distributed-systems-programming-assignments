@@ -4,20 +4,22 @@
 CREATE TABLE sellers (
   seller_id SERIAL PRIMARY KEY,
   seller_name VARCHAR(32) NOT NULL,
+  username VARCHAR(32) NOT NULL,
+  passwd VARCHAR(32) NOT NULL, 
   thumbs_up INTEGER DEFAULT 0,
   thumbs_down INTEGER DEFAULT 0,
   items_sold INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW() -- Move to Sessions table
 );
 
 -- Buyers Table
 CREATE TABLE buyers (
   buyer_id SERIAL PRIMARY KEY,
   buyer_name VARCHAR(32) NOT NULL,
+  username VARCHAR(32) NOT NULL,
+  passwd VARCHAR(32) NOT NULL, 
   items_purchased INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW() -- Move to Sessions table
 );
 
 -- Indexes 

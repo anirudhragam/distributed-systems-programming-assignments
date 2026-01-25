@@ -8,6 +8,8 @@ class SellerAPIClient:
         self.host = host
         self.port = port
         # TODO: Implement TCP socket connection
+        # implement some mechanism to close idle tcp connections (easy way: timeout)
+
     
     def create_account(self, username: str, password: str) -> Dict[str, Any]:
         """
@@ -40,6 +42,11 @@ class SellerAPIClient:
             Response with session_id and seller details
         """
         print(f"[STUB] Login called with username={username}")
+
+        # server will select * username, passwd verify
+        # if exists, start a session - insert into, session table
+        # if doesn't exist then handle error 
+
         return {
             "status": "success",
             "session_id": "sess_12345abcde",
