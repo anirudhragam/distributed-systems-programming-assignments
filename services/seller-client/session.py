@@ -9,8 +9,8 @@ class SellerSession:
     session_id: Optional[str] = None
     seller_id: Optional[int] = None
     seller_name: Optional[str] = None
-    logged_in: bool = False
-    login_time: Optional[datetime] = None
+    logged_in: bool = False # Move logic to server side, using updated_at time_stamp  
+    login_time: Optional[datetime] = None # Move logic to server side, using updated_at time_stamp
     
     def is_logged_in(self) -> bool:
         """Check if seller is currently logged in"""

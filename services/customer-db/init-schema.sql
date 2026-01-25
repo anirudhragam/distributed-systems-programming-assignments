@@ -4,20 +4,22 @@
 CREATE TABLE sellers (
   seller_id SERIAL PRIMARY KEY,
   seller_name VARCHAR(32) NOT NULL,
+  username VARCHAR(32) NOT NULL,
+  passwd VARCHAR(32) NOT NULL, 
   thumbs_up INTEGER DEFAULT 0,
   thumbs_down INTEGER DEFAULT 0,
   items_sold INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW() -- Move to Sessions table
 );
 
 -- Buyers Table
 CREATE TABLE buyers (
   buyer_id SERIAL PRIMARY KEY,
   buyer_name VARCHAR(32) NOT NULL,
+  username VARCHAR(32) NOT NULL,
+  passwd VARCHAR(32) NOT NULL, 
   items_purchased INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW() -- Move to Sessions table
 );
 
 -- Indexes 
@@ -40,3 +42,32 @@ VALUES
   ('Bob Johnson', 0),
   ('Alice Williams', 0),
   ('Charlie Brown', 0);
+
+/*
+Table: carts
+This table links the shopping journey to a specific user.
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| id | UUID | Primary Key. |
+| user_id | UUID | Foreign Key to the User Profile Table. |
+| created_at | Timestamp | Initial creation time. |
+| updated_at | Timestamp | Used for tracking session activity. | 
+
+Table: cart_items 
+This table manages the individual products and their persistence status.
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| id | UUID | Primary Key. |
+| cart_id | UUID | Foreign Key to the carts table (with ON DELETE CASCADE). |
+| product_id | UUID | Reference to the product. |
+| quantity | Integer | Number of units. |
+| is_saved | Boolean | Requirement Logic: TRUE if the SaveCart API was called; FALSE by default. |
+| added_at | Timestamp | Essential for automated cleanup of old sessions. | 
+
+item_feedback
+Column 	Type	Description
+user_id	UUID	Foreign Key to the User table.
+item_id	UUID	Foreign Key to the Item/Product table.
+vote	SmallInt	1 for Thumbs Up, -1 for Thumbs Down (or use a boolean).
+created_at	Timestamp	Allows you to track when the feedback was given for analytics.
+*/
