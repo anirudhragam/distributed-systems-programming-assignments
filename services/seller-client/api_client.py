@@ -1,101 +1,123 @@
 # Stub API client for communicating with backend server
 from typing import Dict, Any, Optional
+import socket
+from utils.socket_utils import send_message, recv_message
+from session import SellerSession
 
 class SellerAPIClient:
     """Client for making API calls to the seller backend server"""
     
-    def __init__(self, host: str = "localhost", port: int = 5000):
-        self.host = host
-        self.port = port
+    def __init__(self, server_host: str = "localhost", server_port: int = 5000):
+        self.server_host = server_host
+        self.server_port = server_port
         # TODO: Implement TCP socket connection
         # implement some mechanism to close idle tcp connections (easy way: timeout)
+        # Creating a TCP socket connection with the Seller server. Setting connection timeout to 15 minutes
+        self.connection = self.connect()
+
+    def send_message_with_reconnect(self, message: dict):
+        """Function to send message with reconnect logic"""
+        try:
+            send_message(self.connection, message)
+            response = recv_message(self.connection)
+            return response
+        except (ConnectionError, socket.error):
+            print("Connection lost. Reconnecting...")
+            self.connect()
+            send_message(self.connection, message)
+            response = recv_message(self.connection)
+            return response
+        
+
+
+    def connect(self):
+        """Function to establish TCP connection to the seller server"""
+        try:
+            self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.connection.settimeout(60*15)  
+            self.connection.connect((self.server_host, self.server_port))
+        except Exception as e:
+            print(f"Error connecting to seller server: {e}")
+            self.connection = None
 
     
     def create_account(self, username: str, password: str) -> Dict[str, Any]:
-        """
-        CreateAccount: Sets up username and password for a new seller.
-        Server returns the registered seller ID.
-        
-        Args:
-            username: Seller username
-            password: Seller password
-            
-        Returns:
-            Response with seller_id or error message
-        """
-        print(f"[STUB] CreateAccount called with username={username}")
-        return {
-            "status": "success",
-            "seller_id": 1,
-            "message": "Account created successfully"
+        """Function to send TCP requests to the seller server, to create a new seller account."""
+        # If server connection is not established or if server terminated the connection, reconnect
+        payload = {
+            "operation": "CreateAccount",
+            "username": username,
+            "password": password
         }
+        response = self.send_message_with_reconnect(payload)
+        return response
     
     def login(self, username: str, password: str) -> Dict[str, Any]:
-        """
-        Login: Seller provides username and password, begins an active session.
-        
-        Args:
-            username: Seller username
-            password: Seller password
-            
-        Returns:
-            Response with session_id and seller details
-        """
-        print(f"[STUB] Login called with username={username}")
+        """Function to send TCP requests to the seller server, to login an existing seller and start a session."""
+        payload = {
+            "operation": "Login",
+            "username": username,
+            "password": password
+        }
+        response = self.send_message_with_reconnect(payload)
 
         # server will select * username, passwd verify
         # if exists, start a session - insert into, session table
         # if doesn't exist then handle error 
 
-        return {
-            "status": "success",
-            "session_id": "sess_12345abcde",
-            "seller_id": 1,
-            "seller_name": username,
-            "message": "Login successful"
-        }
-    
-    def logout(self, session_id: str) -> Dict[str, Any]:
+        return response
+
+        # return {
+        #     "status": "success",
+        #     "session_id": "sess_12345abcde",
+        #     "seller_id": 1,
+        #     "seller_name": username,
+        #     "message": "Login successful"
+        # }
+
+    def logout(self, session: SellerSession) -> Dict[str, Any]:
         """
         Logout: Ends active seller session.
         
         Args:
-            session_id: Current session ID
+            session: Current seller session
             
         Returns:
             Response confirming logout
         """
-        print(f"[STUB] Logout called with session_id={session_id}")
-        return {
-            "status": "success",
-            "message": "Logout successful"
+        payload = {
+            "operation": "Logout",
+            "session_id": session.session_id,
         }
-    
-    def get_seller_rating(self, session_id: str) -> Dict[str, Any]:
-        """
-        GetSellerRating: Returns the feedback for the seller of this session.
+        response = self.send_message_with_reconnect(payload)
+
+        # Server deletes session from session table
         
-        Args:
-            session_id: Current session ID
-            
-        Returns:
-            Response with thumbs_up and thumbs_down counts
-        """
-        print(f"[STUB] GetSellerRating called with session_id={session_id}")
-        return {
-            "status": "success",
-            "thumbs_up": 15,
-            "thumbs_down": 2,
-            "rating": "4.5/5"
+        return response
+    
+        # Session.session_id must be set to None by CLI
+
+        # return {
+        #     "status": "success",
+        #     "message": "Logout successful"
+        # }
+    
+    def get_seller_rating(self, session: SellerSession):
+        """Function to get the seller rating for seller ID associated with current session"""
+        payload = {
+            "operation": "GetSellerRating",
+            "session_id": session.session_id,
+            "seller_id": session.seller_id
         }
-    
-    def register_item_for_sale(self, session_id: str, item_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        RegisterItemForSale: Register items for sale with item attributes and quantity.
-        Server returns the assigned item ID.
+        response = self.send_message_with_reconnect(payload)
+        return response
         
+    
+    def register_item_for_sale(self, session: SellerSession, item_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Function to accept item details and send TCP request to register item for sale.
         Args:
-            session_id: Current session ID
+            session: Current seller session
             item_data: Dictionary containing:
                 - item_name (str): Name of the item
                 - category (int): Item category
@@ -104,86 +126,59 @@ class SellerAPIClient:
                 - sale_price (float): Price of the item
                 - quantity (int): Number of units available
                 
-        Returns:
-            Response with item_id
         """
-        print(f"[STUB] RegisterItemForSale called with session_id={session_id}, item_data={item_data}")
-        return {
-            "status": "success",
-            "item_id": 101,
-            "message": "Item registered for sale successfully"
-        }
-    
-    def change_item_price(self, session_id: str, item_id: int, new_price: float) -> Dict[str, Any]:
+        # Validate item_data?
+
+        payload = {
+            "operation": "RegisterItemForSale",
+            "session_id": session.session_id,
+            "seller_id": session.seller_id,
+            "item_name": item_data["item_name"],
+            "category": item_data["category"],
+            "keywords": item_data["keywords"],  # Check this
+            "condition": item_data["condition"],
+            "sale_price": item_data["sale_price"],
+            "quantity": item_data["quantity"]
+        } 
+        response = self.send_message_with_reconnect(payload)
+        return response
+
+    def change_item_price(self, session: SellerSession, item_id: int, new_price: float) -> Dict[str, Any]:
         """
-        ChangeItemPrice: Update item with new sale price.
-        
-        Args:
-            session_id: Current session ID
-            item_id: ID of the item to update
-            new_price: New sale price
-            
-        Returns:
-            Response confirming price update
+        Function to send TCP request to update price of an item.
         """
-        print(f"[STUB] ChangeItemPrice called with session_id={session_id}, item_id={item_id}, new_price={new_price}")
-        return {
-            "status": "success",
+        payload = {
+            "operation": "ChangeItemPrice",
+            "session_id": session.session_id,
+            "seller_id": session.seller_id,
             "item_id": item_id,
-            "new_price": new_price,
-            "message": "Price updated successfully"
+            "new_price": new_price
         }
-    
-    def update_units_for_sale(self, session_id: str, item_id: int, quantity_change: int) -> Dict[str, Any]:
-        """
-        UpdateUnitsForSale: Given Item ID, remove a quantity of items for sale.
+        response = self.send_message_with_reconnect(payload)
+        return response     
         
-        Args:
-            session_id: Current session ID
-            item_id: ID of the item to update
-            quantity_change: Number of units to remove (negative) or add (positive)
-            
-        Returns:
-            Response with updated quantity
+    def update_units_for_sale(self, session: SellerSession, item_id: int, new_quantity: int) -> Dict[str, Any]:
         """
-        print(f"[STUB] UpdateUnitsForSale called with session_id={session_id}, item_id={item_id}, quantity_change={quantity_change}")
-        return {
-            "status": "success",
+       Function to send TCP request to update quantity of an item.
+        """
+        payload = {
+            "operation": "UpdateUnitsForSale",
+            "session_id": session.session_id,
+            "seller_id": session.seller_id,
             "item_id": item_id,
-            "remaining_quantity": 45,
-            "message": "Units updated successfully"
+            "new_quantity": new_quantity
         }
+        response = self.send_message_with_reconnect(payload)
+        return response     
     
-    def display_items_for_sale(self, session_id: str) -> Dict[str, Any]:
+    def display_items_for_sale(self, session: SellerSession):
         """
-        DisplayItemsForSale: Display all items currently on sale by the seller.
-        
-        Args:
-            session_id: Current session ID
-            
-        Returns:
-            Response with list of items
+       Function to send TCP request to retrieve all items for sale by the seller.
         """
-        print(f"[STUB] DisplayItemsForSale called with session_id={session_id}")
-        return {
-            "status": "success",
-            "items": [
-                {
-                    "item_id": 101,
-                    "item_name": "Laptop Computer",
-                    "category": 1,
-                    "condition": "New",
-                    "sale_price": 999.99,
-                    "quantity": 50
-                },
-                {
-                    "item_id": 102,
-                    "item_name": "Wireless Mouse",
-                    "category": 2,
-                    "condition": "New",
-                    "sale_price": 29.99,
-                    "quantity": 200
-                }
-            ],
-            "total_items": 2
+        payload = {
+            "operation": "UpdateUnitsForSale",
+            "session_id": session.session_id,
+            "seller_id": session.seller_id
         }
+        response = self.send_message_with_reconnect(payload)
+        return response

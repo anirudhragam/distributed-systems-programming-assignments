@@ -13,14 +13,14 @@ from session import SellerSession
 class SellerCLI:
     """Interactive CLI for sellers"""
     
-    def __init__(self, api_host: str = "localhost", api_port: int = 5000):
-        self.api_client = SellerAPIClient(api_host, api_port)
+    def __init__(self, server_host: str = "localhost", server_port: int = 5000):
+        self.api_client = SellerAPIClient(server_host, server_port)
         self.session = SellerSession()
     
     def display_main_menu(self):
         """Display main menu for logged-out users"""
         print("\n" + "="*50)
-        print("SELLER CLIENT - E-Commerce System")
+        print("SELLER - E-Commerce System")
         print("="*50)
         print("1. Create Account")
         print("2. Login")
@@ -30,7 +30,7 @@ class SellerCLI:
     def display_authenticated_menu(self):
         """Display menu for logged-in sellers"""
         print("\n" + "="*50)
-        print(f"Welcome {self.session.seller_name} (ID: {self.session.seller_id})")
+        # print(f"Welcome {self.session.seller_name} (ID: {self.session.seller_id})")
         print("="*50)
         print("1. View My Rating")
         print("2. Register Item for Sale")
@@ -79,19 +79,13 @@ class SellerCLI:
         if response.get("status") == "success":
             self.session.session_id = response.get("session_id")
             self.session.seller_id = response.get("seller_id")
-            self.session.seller_name = response.get("seller_name")
-            self.session.logged_in = True
             print(f"✓ {response.get('message')}")
         else:
             print(f"✗ Error: {response.get('message', 'Login failed')}")
     
     def handle_logout(self):
         """Handle seller logout"""
-        if not self.session.is_logged_in():
-            print("Error: Not logged in")
-            return
-        
-        response = self.api_client.logout(self.session.session_id)
+        response = self.api_client.logout(self.session)
         
         if response.get("status") == "success":
             print(f"✓ {response.get('message')}")
@@ -101,11 +95,7 @@ class SellerCLI:
     
     def handle_get_rating(self):
         """Handle get seller rating"""
-        if not self.session.is_logged_in():
-            print("Error: Must be logged in")
-            return
-        
-        response = self.api_client.get_seller_rating(self.session.session_id)
+        response = self.api_client.get_seller_rating(self.session)
         
         if response.get("status") == "success":
             print("\n--- Your Rating ---")
@@ -117,10 +107,6 @@ class SellerCLI:
     
     def handle_register_item(self):
         """Handle item registration"""
-        if not self.session.is_logged_in():
-            print("Error: Must be logged in")
-            return
-        
         print("\n--- Register Item for Sale ---")
         
         try:
@@ -154,7 +140,7 @@ class SellerCLI:
                 "quantity": quantity
             }
             
-            response = self.api_client.register_item_for_sale(self.session.session_id, item_data)
+            response = self.api_client.register_item_for_sale(self.session, item_data)
             
             if response.get("status") == "success":
                 print(f"✓ {response.get('message')}")
@@ -167,17 +153,13 @@ class SellerCLI:
     
     def handle_change_price(self):
         """Handle price change"""
-        if not self.session.is_logged_in():
-            print("Error: Must be logged in")
-            return
-        
         print("\n--- Change Item Price ---")
         
         try:
             item_id = int(input("Item ID: ").strip())
             new_price = float(input("New price: ").strip())
             
-            response = self.api_client.change_item_price(self.session.session_id, item_id, new_price)
+            response = self.api_client.change_item_price(self.session, item_id, new_price)
             
             if response.get("status") == "success":
                 print(f"✓ {response.get('message')}")
@@ -190,17 +172,13 @@ class SellerCLI:
     
     def handle_update_units(self):
         """Handle units update"""
-        if not self.session.is_logged_in():
-            print("Error: Must be logged in")
-            return
-        
         print("\n--- Update Units for Sale ---")
         
         try:
             item_id = int(input("Item ID: ").strip())
             quantity_change = int(input("Quantity change (negative to remove, positive to add): ").strip())
             
-            response = self.api_client.update_units_for_sale(self.session.session_id, item_id, quantity_change)
+            response = self.api_client.update_units_for_sale(self.session, item_id, quantity_change)
             
             if response.get("status") == "success":
                 print(f"✓ {response.get('message')}")
@@ -213,11 +191,7 @@ class SellerCLI:
     
     def handle_display_items(self):
         """Handle display items"""
-        if not self.session.is_logged_in():
-            print("Error: Must be logged in")
-            return
-        
-        response = self.api_client.display_items_for_sale(self.session.session_id)
+        response = self.api_client.display_items_for_sale(self.session)
         
         if response.get("status") == "success":
             items = response.get("items", [])
@@ -247,7 +221,7 @@ class SellerCLI:
         
         while True:
             try:
-                if not self.session.is_logged_in():
+                if not self.session.session_id:
                     self.display_main_menu()
                     choice = input("Enter your choice: ").strip()
                     
@@ -288,10 +262,10 @@ class SellerCLI:
 
 def main():
     """Entry point"""
-    api_host = os.getenv("API_HOST", "localhost")
-    api_port = int(os.getenv("API_PORT", "5000"))
+    server_host = os.getenv("SERVER_HOST", "localhost")
+    server_port = int(os.getenv("SERVER_PORT", "5000"))
     
-    cli = SellerCLI(api_host, api_port)
+    cli = SellerCLI(server_host, server_port)
     cli.run()
 
 if __name__ == "__main__":
