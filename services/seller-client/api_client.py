@@ -1,4 +1,4 @@
-# Stub API client for communicating with backend server
+# API client for communicating with backend server
 from typing import Dict, Any, Optional
 import socket
 from utils.socket_utils import send_message, recv_message
@@ -17,18 +17,21 @@ class SellerAPIClient:
 
     def send_message_with_reconnect(self, message: dict):
         """Function to send message with reconnect logic"""
-        try:
-            send_message(self.connection, message)
-            response = recv_message(self.connection)
-            return response
-        except (ConnectionError, socket.error):
-            print("Connection lost. Reconnecting...")
-            self.connect()
-            send_message(self.connection, message)
-            response = recv_message(self.connection)
-            return response
+        if self.connection is not None:
+            try:
+                send_message(self.connection, message)
+                response = recv_message(self.connection)
+                return response
+            except (ConnectionError, socket.error):
+                print("Connection lost. Reconnecting...")
+                self.connect()
+                send_message(self.connection, message)
+                response = recv_message(self.connection)
+                return response
+        else:
+            # handle this case
+            pass
         
-
 
     def connect(self):
         """Function to establish TCP connection to the seller server"""
@@ -41,7 +44,7 @@ class SellerAPIClient:
             self.connection = None
 
     
-    def create_account(self, username: str, password: str) -> Dict[str, Any]:
+    def create_account(self, username: str, password: str):
         """Function to send TCP requests to the seller server, to create a new seller account."""
         # If server connection is not established or if server terminated the connection, reconnect
         payload = {
@@ -52,7 +55,7 @@ class SellerAPIClient:
         response = self.send_message_with_reconnect(payload)
         return response
     
-    def login(self, username: str, password: str) -> Dict[str, Any]:
+    def login(self, username: str, password: str):
         """Function to send TCP requests to the seller server, to login an existing seller and start a session."""
         payload = {
             "operation": "Login",
@@ -75,7 +78,7 @@ class SellerAPIClient:
         #     "message": "Login successful"
         # }
 
-    def logout(self, session: SellerSession) -> Dict[str, Any]:
+    def logout(self, session: SellerSession):
         """
         Logout: Ends active seller session.
         
@@ -113,7 +116,7 @@ class SellerAPIClient:
         return response
         
     
-    def register_item_for_sale(self, session: SellerSession, item_data: Dict[str, Any]) -> Dict[str, Any]:
+    def register_item_for_sale(self, session: SellerSession, item_data: dict):
         """
         Function to accept item details and send TCP request to register item for sale.
         Args:
@@ -143,7 +146,7 @@ class SellerAPIClient:
         response = self.send_message_with_reconnect(payload)
         return response
 
-    def change_item_price(self, session: SellerSession, item_id: int, new_price: float) -> Dict[str, Any]:
+    def change_item_price(self, session: SellerSession, item_id: int, new_price: float):
         """
         Function to send TCP request to update price of an item.
         """
@@ -157,7 +160,7 @@ class SellerAPIClient:
         response = self.send_message_with_reconnect(payload)
         return response     
         
-    def update_units_for_sale(self, session: SellerSession, item_id: int, new_quantity: int) -> Dict[str, Any]:
+    def update_units_for_sale(self, session: SellerSession, item_id: int, new_quantity: int):
         """
        Function to send TCP request to update quantity of an item.
         """
