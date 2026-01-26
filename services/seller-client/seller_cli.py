@@ -17,7 +17,7 @@ class SellerCLI:
         self.api_client = SellerAPIClient(server_host, server_port)
         self.session = SellerSession()
     
-    def display_main_menu(self):
+    def display_authentication_menu(self):
         """Display main menu for logged-out users"""
         print("\n" + "="*50)
         print("SELLER - E-Commerce System")
@@ -27,7 +27,7 @@ class SellerCLI:
         print("3. Exit")
         print("="*50)
     
-    def display_authenticated_menu(self):
+    def display_main_menu(self):
         """Display menu for logged-in sellers"""
         print("\n" + "="*50)
         # print(f"Welcome {self.session.seller_name} (ID: {self.session.seller_id})")
@@ -55,11 +55,11 @@ class SellerCLI:
         
         response = self.api_client.create_account(username, password)
         
-        if response.get("status") == "success":
-            print(f"✓ {response.get('message')}")
+        if response.get("status") == "OK":
+            print(f"{response.get('message')}")
             print(f"  Your Seller ID: {response.get('seller_id')}")
         else:
-            print(f"✗ Error: {response.get('message', 'Unknown error')}")
+            print(f"Error: {response.get('message', 'Unknown error')}")
     
     def handle_login(self):
         """Handle seller login"""
@@ -76,34 +76,33 @@ class SellerCLI:
         
         response = self.api_client.login(username, password)
         
-        if response.get("status") == "success":
+        if response.get("status") == "OK":
             self.session.session_id = response.get("session_id")
             self.session.seller_id = response.get("seller_id")
-            print(f"✓ {response.get('message')}")
+            print(f"{response.get('message')}")
         else:
-            print(f"✗ Error: {response.get('message', 'Login failed')}")
+            print(f"Error: {response.get('message', 'Login failed')}")
     
     def handle_logout(self):
         """Handle seller logout"""
         response = self.api_client.logout(self.session)
         
-        if response.get("status") == "success":
-            print(f"✓ {response.get('message')}")
+        if response.get("status") == "OK":
+            print(f"{response.get('message')}")
             self.session.clear()
         else:
-            print(f"✗ Error: {response.get('message', 'Logout failed')}")
+            print(f"Error: {response.get('message', 'Logout failed')}")
     
     def handle_get_rating(self):
         """Handle get seller rating"""
         response = self.api_client.get_seller_rating(self.session)
         
-        if response.get("status") == "success":
+        if response.get("status") == "OK":
             print("\n--- Your Rating ---")
             print(f"Thumbs Up: {response.get('thumbs_up')}")
             print(f"Thumbs Down: {response.get('thumbs_down')}")
-            print(f"Overall Rating: {response.get('rating')}")
         else:
-            print(f"✗ Error: {response.get('message', 'Could not fetch rating')}")
+            print(f"Error: {response.get('message', 'Could not fetch rating')}")
     
     def handle_register_item(self):
         """Handle item registration"""
@@ -142,11 +141,10 @@ class SellerCLI:
             
             response = self.api_client.register_item_for_sale(self.session, item_data)
             
-            if response.get("status") == "success":
-                print(f"✓ {response.get('message')}")
-                print(f"  Item ID: {response.get('item_id')}")
+            if response.get("status") == "OK":
+                print(f"{response.get('message')}")
             else:
-                print(f"✗ Error: {response.get('message', 'Could not register item')}")
+                print(f"Error: {response.get('message', 'Could not register item')}")
         
         except ValueError as e:
             print(f"Error: Invalid input - {str(e)}")
@@ -161,14 +159,13 @@ class SellerCLI:
             
             response = self.api_client.change_item_price(self.session, item_id, new_price)
             
-            if response.get("status") == "success":
-                print(f"✓ {response.get('message')}")
-                print(f"  Item {item_id} new price: ${response.get('new_price')}")
+            if response.get("status") == "OK":
+                print(f"{response.get('message')}")
             else:
-                print(f"✗ Error: {response.get('message', 'Could not update price')}")
+                print(f"Error: {response.get('message', 'Could not update price')}")
         
         except ValueError as e:
-            print(f"Error: Invalid input - {str(e)}")
+            print(f"Error: Invalid input : {str(e)}")
     
     def handle_update_units(self):
         """Handle units update"""
@@ -176,15 +173,15 @@ class SellerCLI:
         
         try:
             item_id = int(input("Item ID: ").strip())
-            quantity_change = int(input("Quantity change (negative to remove, positive to add): ").strip())
+            quantity_change = int(input("Quantity Change: ").strip())
             
             response = self.api_client.update_units_for_sale(self.session, item_id, quantity_change)
             
-            if response.get("status") == "success":
-                print(f"✓ {response.get('message')}")
-                print(f"  Item {item_id} remaining quantity: {response.get('remaining_quantity')}")
+            if response.get("status") == "OK":
+                print(f"{response.get('message')}")
+                
             else:
-                print(f"✗ Error: {response.get('message', 'Could not update units')}")
+                print(f"Error: {response.get('message', 'Could not update units')}")
         
         except ValueError as e:
             print(f"Error: Invalid input - {str(e)}")
@@ -193,36 +190,37 @@ class SellerCLI:
         """Handle display items"""
         response = self.api_client.display_items_for_sale(self.session)
         
-        if response.get("status") == "success":
+        if response.get("status") == "OK":
             items = response.get("items", [])
             
             if not items:
-                print("\nYou have no items for sale")
+                print(f"{response.get('message')}")
                 return
             
             print("\n--- Your Items for Sale ---")
-            print(f"Total items: {response.get('total_items')}\n")
-            
-            for item in items:
-                print(f"Item ID: {item['item_id']}")
+            for i, item in enumerate(items, start=1):
+                print(f"{i}. Item ID: {item['item_id']}")
                 print(f"  Name: {item['item_name']}")
                 print(f"  Category: {item['category']}")
+                print(f"  Keywords: {', '.join(item['keywords'])}")
                 print(f"  Condition: {item['condition']}")
                 print(f"  Price: ${item['sale_price']}")
                 print(f"  Quantity: {item['quantity']}")
+                print(f"  Thumbs Up: {item['thumbs_up']}")
+                print(f"  Thumbs Down: {item['thumbs_down']}")
                 print()
         else:
-            print(f"✗ Error: {response.get('message', 'Could not fetch items')}")
+            print(f"Error: {response.get('message', 'Could not fetch items')}")
     
     def run(self):
         """Main CLI loop"""
         print("\nSeller Client initialized successfully!")
-        print(f"API Server: {self.api_client.host}:{self.api_client.port}")
+        print(f"API Server: {self.api_client.server_host}:{self.api_client.server_port}")
         
         while True:
             try:
                 if not self.session.session_id:
-                    self.display_main_menu()
+                    self.display_authentication_menu()
                     choice = input("Enter your choice: ").strip()
                     
                     if choice == "1":
@@ -236,7 +234,7 @@ class SellerCLI:
                         print("Invalid choice. Please try again.")
                 
                 else:
-                    self.display_authenticated_menu()
+                    self.display_main_menu()
                     choice = input("Enter your choice: ").strip()
                     
                     if choice == "1":

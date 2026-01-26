@@ -63,47 +63,16 @@ class SellerAPIClient:
             "password": password
         }
         response = self.send_message_with_reconnect(payload)
-
-        # server will select * username, passwd verify
-        # if exists, start a session - insert into, session table
-        # if doesn't exist then handle error 
-
         return response
 
-        # return {
-        #     "status": "success",
-        #     "session_id": "sess_12345abcde",
-        #     "seller_id": 1,
-        #     "seller_name": username,
-        #     "message": "Login successful"
-        # }
-
     def logout(self, session: SellerSession):
-        """
-        Logout: Ends active seller session.
-        
-        Args:
-            session: Current seller session
-            
-        Returns:
-            Response confirming logout
-        """
+        """Function to send TCP requests to the seller server, to logout an existing seller."""
         payload = {
             "operation": "Logout",
             "session_id": session.session_id,
         }
         response = self.send_message_with_reconnect(payload)
-
-        # Server deletes session from session table
-        
         return response
-    
-        # Session.session_id must be set to None by CLI
-
-        # return {
-        #     "status": "success",
-        #     "message": "Logout successful"
-        # }
     
     def get_seller_rating(self, session: SellerSession):
         """Function to get the seller rating for seller ID associated with current session"""
@@ -160,7 +129,7 @@ class SellerAPIClient:
         response = self.send_message_with_reconnect(payload)
         return response     
         
-    def update_units_for_sale(self, session: SellerSession, item_id: int, new_quantity: int):
+    def update_units_for_sale(self, session: SellerSession, item_id: int, quantity_change: int):
         """
        Function to send TCP request to update quantity of an item.
         """
@@ -169,7 +138,7 @@ class SellerAPIClient:
             "session_id": session.session_id,
             "seller_id": session.seller_id,
             "item_id": item_id,
-            "new_quantity": new_quantity
+            "quantity_change": quantity_change
         }
         response = self.send_message_with_reconnect(payload)
         return response     
@@ -179,7 +148,7 @@ class SellerAPIClient:
        Function to send TCP request to retrieve all items for sale by the seller.
         """
         payload = {
-            "operation": "UpdateUnitsForSale",
+            "operation": "DisplayItemsForSale",
             "session_id": session.session_id,
             "seller_id": session.seller_id
         }
