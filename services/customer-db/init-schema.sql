@@ -20,9 +20,34 @@ CREATE TABLE buyers (
   updated_at TIMESTAMP DEFAULT NOW() -- Move to Sessions table
 );
 
+-- Seller Sessions Table
+CREATE TABLE seller_sessions (
+  session_id UUID PRIMARY KEY,
+  seller_id INTEGER NOT NULL,
+  last_active_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Buyer Sessions Table
+CREATE TABLE buyer_sessions (
+  session_id UUID PRIMARY KEY,
+  buyer_id INTEGER NOT NULL,
+  last_active_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Add foreign key constraints to buyer and seller session tables
+ALTER TABLE seller_sessions ADD CONSTRAINT fk_seller_session 
+  FOREIGN KEY (seller_id) REFERENCES sellers(seller_id) 
+  ON DELETE CASCADE;
+
+ALTER TABLE buyer_sessions ADD CONSTRAINT fk_buyer_session 
+  FOREIGN KEY (buyer_id) REFERENCES buyers(buyer_id) 
+  ON DELETE CASCADE;
+
 -- Indexes 
 CREATE INDEX idx_sellers_username ON sellers(username);
 CREATE INDEX idx_buyers_username ON buyers(username);
+CREATE INDEX idx_sellers_last_accessed ON seller_sessions(last_active_at);
+CREATE INDEX idx_buyers_last_accessed ON buyer_sessions(last_active_at);
 
 -- Sample data for sellers
 INSERT INTO sellers (username, thumbs_up, thumbs_down, items_sold)
