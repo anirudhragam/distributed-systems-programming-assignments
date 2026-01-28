@@ -7,13 +7,14 @@ from session import SellerSession
 class SellerAPIClient:
     """Client for making API calls to the seller backend server"""
     
-    def __init__(self, server_host: str = "localhost", server_port: int = 5000):
+    def __init__(self, server_host: str = "seller-server", server_port: int = 5000):
         self.server_host = server_host
         self.server_port = server_port
+        self.connection = None
         # TODO: Implement TCP socket connection
         # implement some mechanism to close idle tcp connections (easy way: timeout)
         # Creating a TCP socket connection with the Seller server. Setting connection timeout to 15 minutes
-        self.connection = self.connect()
+        self.connect()
 
     def send_message_with_reconnect(self, message: dict):
         """Function to send message with reconnect logic"""

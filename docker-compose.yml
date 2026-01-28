@@ -12,9 +12,14 @@ services:
       POSTGRES_USER: product_user
       POSTGRES_PASSWORD: product_password
     volumes:
-      - product_db_data:/var/lib/postgresql/data
+      - product_db_data:/var/lib/postgresql
     networks:
       - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   customer-db:
     build:
@@ -28,22 +33,24 @@ services:
       POSTGRES_USER: customer_user
       POSTGRES_PASSWORD: customer_password
     volumes:
-      - customer_db_data:/var/lib/postgresql/data
+      - customer_db_data:/var/lib/postgresql
     networks:
       - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  seller-client:
+  sreller-client:
     build:
       context: ./services/seller-client
       dockerfile: Dockerfile
     container_name: seller_client_container
     depends_on:
-      - product-db
-      - customer-db
-    ports:
-      - "5001:5001"
+      - seller-server
     environment:
-      SERVER_HOST: localhost
+      SERVER_HOST: seller-serve
       SERVER_PORT: 5000
     stdin_open: true
     tty: true
@@ -56,12 +63,14 @@ services:
       dockerfile: Dockerfile
     container_name: seller_server_container
     depends_on:
-      - product-db
-      - customer-db
+      product-db:
+        condition: service_healthy
+      customer-db:
+        condition: service_healthy
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
-      SERVER_HOST: localhost
+      SERVER_HOST: 0.0.0.0 # Listen on all interfaces
       SERVER_PORT: 5000
     stdin_open: true
     tty: true

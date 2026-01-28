@@ -2,7 +2,7 @@
 
 CREATE TABLE products (
   item_id SERIAL PRIMARY KEY,
-  seller_id VARCHAR(10) NOT NULL,
+  seller_id INTEGER NOT NULL,
   item_name VARCHAR(32) NOT NULL,
   category INTEGER NOT NULL,
   keywords VARCHAR(8)[] DEFAULT ARRAY[]::VARCHAR(8)[],
@@ -10,7 +10,7 @@ CREATE TABLE products (
   sale_price DECIMAL(10, 2) NOT NULL,
   quantity INTEGER NOT NULL DEFAULT 0,
   thumbs_up INTEGER DEFAULT 0,
-  thumbs_down INTEGER DEFAULT 0,
+  thumbs_down INTEGER DEFAULT 0
 );
 
 -- Indexes for better query performance

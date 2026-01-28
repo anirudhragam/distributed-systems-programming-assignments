@@ -1,10 +1,18 @@
 from hmac import new
 import os
 import socket
+
 from utils.socket_utils import send_message, recv_message
-from psycopg2 import pool
+from psycopg2 import pool, extras, extensions, _psycopg
 import threading
 import uuid
+
+# Define extension to convert DECIMAL to FLOAT
+DEC2FLOAT = extensions.new_type(
+    _psycopg.DECIMAL.values,
+    'DEC2FLOAT',
+    extensions.FLOAT
+)
 
 class SellerServer:
     """Server for serving API requests for the server API client"""
@@ -19,7 +27,7 @@ class SellerServer:
             minconn = 1,
             maxconn = 25,
             user = "product_user",
-            password = "product_pass",
+            password = "product_password",
             host = "product-db",
             port = "5432",
             database = "product_db"
@@ -28,11 +36,15 @@ class SellerServer:
             minconn = 1,
             maxconn = 25,
             user = "customer_user",
-            password = "customer_pass",
+            password = "customer_password",
             host = "customer-db",
-            port = "5433",
+            port = "5432",
             database = "customer_db"
         )
+        # register uuid extension
+        extras.register_uuid()
+        # register decimal to float extension
+        extensions.register_type(DEC2FLOAT)
 
     def listen(self):
         """Function to listen for incoming TCP connection requests on the specified host and port"""
@@ -41,9 +53,11 @@ class SellerServer:
             self.socket.bind((self.server_host, self.server_port))
             self.socket.listen(10) # Change number of backlog connections, if needed
             print(f"Seller server listening on {self.server_host}:{self.server_port}")
+            return self.socket
         except Exception as e:
             print(f"Error server unable to listen on {self.server_host}:{self.server_port}: {e}")
             self.socket = None
+            return None
 
     def create_account(self, payload: dict):
         """Function to create a new seller account, if it does not already exist."""
@@ -53,7 +67,7 @@ class SellerServer:
         # Get a connection from the customer DB pool
         customer_db_conn = self.customer_db_pool.getconn()
         try:
-            cursor = customer_db_conn.cursor()
+            cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
             # Check if username already exists
             cursor.execute("SELECT seller_id FROM sellers WHERE username = %s", (username,))
             result = cursor.fetchone()
@@ -62,10 +76,10 @@ class SellerServer:
 
             # Insert new seller into the database
             cursor.execute(
-                "INSERT INTO sellers (username, password) VALUES (%s, %s) RETURNING seller_id",
+                "INSERT INTO sellers (username, passwd) VALUES (%s, %s) RETURNING seller_id",
                 (username, password)
             )
-            seller_id = cursor.fetchone()[0]
+            seller_id = cursor.fetchone()['seller_id']
             customer_db_conn.commit()
             return {"status": "OK", "seller_id": seller_id}
         except Exception as e:
@@ -82,15 +96,15 @@ class SellerServer:
         customer_db_conn = self.customer_db_pool.getconn()
 
         try:
-            cursor = customer_db_conn.cursor()
+            cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
             # Check if username already exists
             cursor.execute("SELECT seller_id, username FROM sellers WHERE username = %s AND passwd = %s", (username, password))
             result = cursor.fetchone()
             if not result:
                 return {"status": "Error", "message": "Username/Password combination does not exist."}
 
-            seller_id = result[0]
-            username = result[1]
+            seller_id = result['seller_id']
+            username = result['username']
 
             # Create a new session and add it to the seller_sessions table
             session_id = str(uuid.uuid4())
@@ -112,9 +126,9 @@ class SellerServer:
         customer_db_conn = self.customer_db_pool.getconn()
 
         try:
-            cursor = customer_db_conn.cursor()
+            cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
             # Delete the session from the seller_sessions table
-            cursor.execute("DELETE FROM seller_sessions WHERE session_id = %s", (session_id))
+            cursor.execute("DELETE FROM seller_sessions WHERE session_id = %s", (session_id,))
             customer_db_conn.commit()
             return {"status": "OK", "message": "Successfully logged out."}
         
@@ -128,17 +142,22 @@ class SellerServer:
         customer_db_conn = self.customer_db_pool.getconn()
 
         try:
-            cursor = customer_db_conn.cursor()
+            cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
             # Check if session ID exists
-            cursor.execute("SELECT seller_id FROM seller_sessions WHERE session_id = %s AND last_active_at - NOW() < INTERVAL '5 minutes'", (session_id))
+            # print("SELECT seller_id FROM seller_sessions WHERE session_id = %s AND last_active_at > NOW() - INTERVAL '5 minutes'", (session_id,))
+            cursor.execute("SELECT seller_id FROM seller_sessions WHERE session_id = %s AND last_active_at > NOW() - INTERVAL '2 minutes'", (session_id,))
+
             result = cursor.fetchone()
+            print(f"Session check result: {result}")
             if not result:
                 # Session expired, delete from seller_sessions table and return False
-                cursor.execute("DELETE FROM seller_sessions WHERE session_id = %s", (session_id))
+                print("Deleting expired session")
+                cursor.execute("DELETE FROM seller_sessions WHERE session_id = %s", (session_id,))
+                customer_db_conn.commit()
                 return False
             
             # Session valid, update last_active_at timestamp
-            cursor.execute("UPDATE seller_sessions SET last_active_at = NOW() WHERE session_id = %s", (session_id))
+            cursor.execute("UPDATE seller_sessions SET last_active_at = NOW() WHERE session_id = %s", (session_id,))
             customer_db_conn.commit()
             return True
         
@@ -157,20 +176,20 @@ class SellerServer:
         seller_id = payload.get("seller_id")
 
         if not self.check_if_session_valid(session_id):
-            return {"status": "Error", "message": "Session expired. Please log in again."}
+            return {"status": "Timeout", "message": "Session expired. Please log in again."}
 
         # Get a connection from the customer DB pool
         customer_db_conn = self.customer_db_pool.getconn()
         try:
-            cursor = customer_db_conn.cursor()
+            cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
 
             # Fetch thumbs up and thumbs down counts
-            cursor.execute("SELECT thumbs_up, thumbs_down FROM sellers WHERE seller_id = %s",(seller_id))
+            cursor.execute("SELECT thumbs_up, thumbs_down FROM sellers WHERE seller_id = %s",(seller_id,))
             result = cursor.fetchone()
             if not result:
                 return {"status": "Error", "message": "Seller ID does not exist."}
 
-            thumbs_up, thumbs_down = result
+            thumbs_up, thumbs_down = result['thumbs_up'], result['thumbs_down']
 
             return {"status": "OK", "thumbs_up": thumbs_up, "thumbs_down": thumbs_down}
         
@@ -201,13 +220,13 @@ class SellerServer:
         product_db_conn = self.product_db_pool.getconn()
 
         try:
-            cursor = product_db_conn.cursor()
+            cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
             # Insert new item into the products table
             cursor.execute(
                 "INSERT INTO products (seller_id, item_name, category, keywords, condition, sale_price, quantity) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING item_id",
                 (seller_id, item_name, category, keywords, condition, sale_price, quantity)
             )
-            item_id = cursor.fetchone()[0]
+            item_id = cursor.fetchone()['item_id']
             product_db_conn.commit()
             return {"status": "OK", "message": f"Item {item_name} registered for sale successfully with Item ID {item_id}"}
         except Exception as e:
@@ -232,9 +251,9 @@ class SellerServer:
         product_db_conn = self.product_db_pool.getconn()
 
         try:
-            cursor = product_db_conn.cursor()
+            cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
             # Update the item price
-            cursor.execute("UPDATE items SET price = %s WHERE item_id = %s AND seller_id = %s", (new_price, item_id, seller_id))
+            cursor.execute("UPDATE products SET sale_price = %s WHERE item_id = %s AND seller_id = %s", (new_price, item_id, int(seller_id)))
             if cursor.rowcount == 0:
                 return {"status": "Error", "message": "Item ID does not exist or does not belong to the seller."}
             product_db_conn.commit()
@@ -261,21 +280,21 @@ class SellerServer:
         product_db_conn = self.product_db_pool.getconn()
 
         try:
-            cursor = product_db_conn.cursor()
+            cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
             # Fetch current quantity
             cursor.execute("SELECT quantity FROM products WHERE item_id = %s AND seller_id = %s", (item_id, seller_id))
             result = cursor.fetchone()
             if not result:
                 return {"status": "Error", "message": "Item ID does not exist or does not belong to the seller."}
-            
-            current_quantity = result[0]
+
+            current_quantity = result['quantity']
             new_quantity = current_quantity - quantity_change
 
             if new_quantity < 0:
                 return {"status": "Error", "message": "Available units cannot be negative."}
             
             # Update the item quantity
-            cursor.execute("UPDATE items SET quantity = %s WHERE item_id = %s AND seller_id = %s", (new_quantity, item_id, seller_id))
+            cursor.execute("UPDATE products SET quantity = %s WHERE item_id = %s AND seller_id = %s", (new_quantity, item_id, int(seller_id)))
             product_db_conn.commit()
             return {"status": "OK", "message": f"Item quantity for item {item_id} updated successfully to {new_quantity}"}
         except Exception as e:
@@ -295,8 +314,8 @@ class SellerServer:
         product_db_conn = self.product_db_pool.getconn()    
 
         try:
-            cursor = product_db_conn.cursor()
-            cursor.execute("SELECT item_id, item_name, category, keywords, condition, sale_price, quantity, thumbs_up, thumbs_down FROM products WHERE seller_id = %s", (seller_id))
+            cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+            cursor.execute("SELECT item_id, item_name, category, keywords, condition, sale_price::float, quantity, thumbs_up, thumbs_down FROM products WHERE seller_id = %s", (seller_id,))
             items = cursor.fetchall()
             if not items:
                 return {"status": "OK", "message": "No items for sale."}
@@ -304,6 +323,8 @@ class SellerServer:
         except Exception as e:
             print(f"Error displaying items for sale: {e}")
             return {"status": "Error", "message": "Failed to display items for sale."}
+        finally:
+            self.product_db_pool.putconn(product_db_conn)
 
     def handle_request(self, connection, addr):
         """Function to handle incoming client requests. Executed in a separate thread for each connection."""

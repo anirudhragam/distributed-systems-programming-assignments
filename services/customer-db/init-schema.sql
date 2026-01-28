@@ -50,21 +50,21 @@ CREATE INDEX idx_sellers_last_accessed ON seller_sessions(last_active_at);
 CREATE INDEX idx_buyers_last_accessed ON buyer_sessions(last_active_at);
 
 -- Sample data for sellers
-INSERT INTO sellers (username, thumbs_up, thumbs_down, items_sold)
+INSERT INTO sellers (username, passwd, thumbs_up, thumbs_down, items_sold)
 VALUES 
-  ('TechMart Store', 0, 0, 0),
-  ('Electronics Plus', 0, 0, 0),
-  ('Quality Goods', 0, 0, 0),
-  ('Daily Deals', 0, 0, 0);
+  ('TechMart Store', 'password1', 0, 0, 0),
+  ('Electronics Plus', 'password2', 0, 0, 0),
+  ('Quality Goods', 'password3', 0, 0, 0),
+  ('Daily Deals', 'password4', 0, 0, 0);
 
 -- Sample data for buyers
-INSERT INTO buyers (username, items_purchased)
+INSERT INTO buyers (username, passwd, items_purchased)
 VALUES 
-  ('John Doe', 0),
-  ('Jane Smith', 0),
-  ('Bob Johnson', 0),
-  ('Alice Williams', 0),
-  ('Charlie Brown', 0);
+  ('John Doe', 'password1', 0),
+  ('Jane Smith', 'password2', 0),
+  ('Bob Johnson', 'password3', 0),
+  ('Alice Williams', 'password4', 0),
+  ('Charlie Brown', 'password5', 0);
 
 /*
 Table: carts

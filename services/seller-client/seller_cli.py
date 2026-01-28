@@ -13,7 +13,7 @@ from session import SellerSession
 class SellerCLI:
     """Interactive CLI for sellers"""
     
-    def __init__(self, server_host: str = "localhost", server_port: int = 5000):
+    def __init__(self, server_host: str = "seller-server", server_port: int = 5000):
         self.api_client = SellerAPIClient(server_host, server_port)
         self.session = SellerSession()
     
@@ -101,6 +101,9 @@ class SellerCLI:
             print("\n--- Your Rating ---")
             print(f"Thumbs Up: {response.get('thumbs_up')}")
             print(f"Thumbs Down: {response.get('thumbs_down')}")
+        elif response.get("status") == "Timeout":
+            print(f"Error: {response.get('message', 'Session timed out')}")
+            self.session.clear()
         else:
             print(f"Error: {response.get('message', 'Could not fetch rating')}")
     
@@ -143,6 +146,9 @@ class SellerCLI:
             
             if response.get("status") == "OK":
                 print(f"{response.get('message')}")
+            elif response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
             else:
                 print(f"Error: {response.get('message', 'Could not register item')}")
         
@@ -161,6 +167,9 @@ class SellerCLI:
             
             if response.get("status") == "OK":
                 print(f"{response.get('message')}")
+            elif response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
             else:
                 print(f"Error: {response.get('message', 'Could not update price')}")
         
@@ -179,7 +188,9 @@ class SellerCLI:
             
             if response.get("status") == "OK":
                 print(f"{response.get('message')}")
-                
+            elif response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
             else:
                 print(f"Error: {response.get('message', 'Could not update units')}")
         
@@ -191,6 +202,7 @@ class SellerCLI:
         response = self.api_client.display_items_for_sale(self.session)
         
         if response.get("status") == "OK":
+            
             items = response.get("items", [])
             
             if not items:
@@ -209,6 +221,9 @@ class SellerCLI:
                 print(f"  Thumbs Up: {item['thumbs_up']}")
                 print(f"  Thumbs Down: {item['thumbs_down']}")
                 print()
+        elif response.get("status") == "Timeout":
+            print(f"Error: {response.get('message', 'Session timed out')}")
+            self.session.clear()
         else:
             print(f"Error: {response.get('message', 'Could not fetch items')}")
     
@@ -260,7 +275,7 @@ class SellerCLI:
 
 def main():
     """Entry point"""
-    server_host = os.getenv("SERVER_HOST", "localhost")
+    server_host = os.getenv("SERVER_HOST", "seller-server")
     server_port = int(os.getenv("SERVER_PORT", "5000"))
     
     cli = SellerCLI(server_host, server_port)

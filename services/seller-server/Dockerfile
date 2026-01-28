@@ -6,4 +6,4 @@ COPY . .
 
 RUN pip install -r requirements.txt
 
-ENTRYPOINT ["python", "seller_cli.py"]
+ENTRYPOINT ["python", "server.py"]
