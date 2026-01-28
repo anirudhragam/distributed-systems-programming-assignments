@@ -44,80 +44,227 @@ GetBuyerPurchases: Get a history of item IDs purchased by the buyer of the
 active session.
 """
 
-def handle_create_account():
-    # called when user selects the create account option from cli menu
+import os
+from api_client import BuyerAPIClient
+from session import BuyerSession
 
-    # asks for user registration details
 
-    # sends requestr to buyer api client
+class BuyerCLI:
+    """Interactive CLI for buyers"""
 
-    # api client opens tcp connection to buyer server and sends create account request
-
-    # buyer server runs SQL to insert buyer in the customer db
-
-    # buyer server sends OK response to buyer api client
-
-    # buyer api client sends OK to client interface 
-
-    # client cli shows OK message to buyer
-    pass
-
-def handle_login():
-    # called when user selects the login option from the cli menu
-
-    # asks for user login details
-
-    # sends to api client
-
-    # api client opens tcp connection to buyer server and sends login request
-
-    # buyer server validates the credentials first, and only if valid, 
-    # inserts session timestamp in customer db
-
-    # buyer server returns session details to buyer client
-
-    # buyer client stores active session details locally for this user
-
-    # buyer client interface shows success message to buyer on CLI
-    pass
-
-def handle_logout():
-    # called when user selects the logout option on the cli menu
-
-    # cli sends session id to api client
+    def __init__(self, server_host: str = "buyer-server", server_port: int = 8000):
+        self.api_client = BuyerAPIClient(server_host, server_port)
+        self.session = BuyerSession()
+  
+    def display_authentication_menu(self):
+        """Display main menu for logged-out users"""
+        print("\n" + "="*50)
+        print("BUYER - E-Commerce System")
+        print("="*50)
+        print("1. Create Account")
+        print("2. Login")
+        print("3. Exit")
+        print("="*50)
     
-    # api client opens tcp connection to server, passing session id
+    def display_main_menu(self):
+        """Display menu for logged-in buyers"""
+        print("\n" + "="*50)
+        print("="*50)
+        print("1. Search Items for Sale")
+        print("2. Get Item")
+        print("3. Add Item to Cart")
+        print("4. Remove Item from Cart")
+        print("5. Save Cart")
+        print("6. Clear Cart")
+        print("7. Display Cart")
+        print("8. Make Purchase")
+        print("9. Provide Feedback")
+        print("10. Get Seller Rating")
+        print("11. Get Buyer Purchases")
+        print("12. Logout")
+        print("="*50)
+ 
+    def handle_create_account(self):
+        """Handle account creation"""
+        print("\n--- Create Account ---")
+        username = input("Enter username: ").strip()
+        if not username:
+            print("Error: Username cannot be empty")
+            return
+        
+        password = input("Enter password: ").strip()
+        if not password:
+            print("Error: Password cannot be empty")
+            return
+        
+        response = self.api_client.create_account(username, password)
+        
+        if response.get("status") == "OK":
+            print(f"{response.get('message')}")
+            print(f"  Your Buyer ID: {response.get('buyer_id')}")
+        else:
+            print(f"Error: {response.get('message', 'Unknown error')}")
     
-    # server deletes session id from sessions table 
-    pass
+    def handle_login(self):
+        """Handle buyer login"""
+        print("\n--- Login ---")
+        username = input("Enter username: ").strip()
+        if not username:
+            print("Error: Username cannot be empty")
+            return
+        
+        password = input("Enter password: ").strip()
+        if not password:
+            print("Error: Password cannot be empty")
+            return
+        
+        response = self.api_client.login(username, password)
+        
+        if response.get("status") == "OK":
+            self.session.session_id = response.get("session_id")
+            self.session.buyer_id = response.get("buyer_id")
+            print(f"{response.get('message')}")
+        else:
+            print(f"Error: {response.get('message', 'Login failed')}")
+    
+    def handle_logout(self):
+        """Handle buyer logout"""
+        response = self.api_client.logout(self.session)
+        
+        if response.get("status") == "OK":
+            print(f"{response.get('message')}")
+            self.session.clear()
+        else:
+            print(f"Error: {response.get('message', 'Logout failed')}")
+    
+    def handle_search_items(self):
+        """Handle search items for sale"""
 
-def handle_search_items():
-    pass
+        # Given an item category and up to five keywords, return
+# available items (and their attributes) for sale.
+        print("\n--- Search Items for Sale ---")
+        category = input("Enter item category: ").strip()
+        keywords = input("Enter up to five keywords (comma-separated): ").strip().split(",")
+        pass
 
-def get_item():
-    # called when user selects get item option on the cli menu
+    def handle_get_item(self):
+        """Handle get item by id"""
+        # called when user selects get item option on the cli menu
 
-    # cli sends item id to api client
+        # cli sends item id to api client
 
-    # api client opens a tcp connection passing item id to server
+        # api client opens a tcp connection passing item id to server
 
-    # server queries product db for item id
+        # server queries product db for item id
 
-    # server returns results to api client
+        # server returns results to api client
 
-    # api client returns results to cli
+        # api client returns results to cli
 
-    # cli displays results
-    pass
+        # cli displays results
+        pass
 
-def add_item_to_cart():
+    def handle_add_item_to_cart(self):
+        """Handle add item to cart"""
+        pass
+
+    def handle_remove_item_from_cart(self):
+        """Handle remove item from cart"""
+        pass
+
+    def handle_save_cart(self):
+        """Handle save cart"""
+        pass
+
+    def handle_clear_cart(self):
+        """Handle clear cart"""
+        pass
+
+    def handle_display_cart(self):
+        """Handle display cart"""
+        pass
+
+    def handle_make_purchase(self):
+        """To be implemented in future. Handle make purchase"""
+        pass
+
+    def handle_provide_feedback(self):
+        """Handle provide feedback for item"""
+        pass
+
+    def handle_get_seller_rating(self):
+        """Handle get seller rating"""
+        pass
+
+    def handle_get_buyer_purchases(self):
+        """Handle get buyer purchase history"""
+        pass
+
+    def run(self):
+        """Main CLI loop"""
+        print("\nBuyer Client initialised successfully!")
+        print(f"API Server: {self.api_client.server_host}:{self.api_client.server_port}")
+
+        while True:
+            try:
+                if not self.session.is_active():
+                    self.display_authentication_menu()
+                    choice = input("Select an option: ").strip()
+
+                    if choice == "1":
+                        self.handle_create_account()
+                    elif choice == "2":
+                        self.handle_login()
+                    elif choice == "3":
+                        print("\nGoodbye!")
+                        break
+                    else:
+                        print("Invalid option. Please try again.")
+                else:
+                    self.display_main_menu()
+                    choice = input("Select an option: ").strip()
+
+                    if choice == "1":
+                        self.handle_search_items()
+                    elif choice == "2":
+                        self.handle_get_item()
+                    elif choice == "3":
+                        self.handle_add_item_to_cart()
+                    elif choice == "4":
+                        self.handle_remove_item_from_cart()
+                    elif choice == "5":
+                        self.handle_save_cart()
+                    elif choice == "6":
+                        self.handle_clear_cart()
+                    elif choice == "7":
+                        self.handle_display_cart()
+                    elif choice == "8":
+                        self.handle_make_purchase()
+                    elif choice == "9":
+                        self.handle_provide_feedback()
+                    elif choice == "10":
+                        self.handle_get_seller_rating()
+                    elif choice == "11":
+                        self.handle_get_buyer_purchases()
+                    elif choice == "12":
+                        self.handle_logout()
+                    else:
+                        print("Invalid option. Please try again.")
+            except KeyboardInterrupt:
+                print("\n\nExiting...")
+                break
+            except Exception as e:
+                print(f"Error: {str(e)}")
     
 
+def main():
+    """Entry point for buyer CLI"""
+    server_host = os.getenv("SERVER_HOST", "buyer-server")
+    server_port = int(os.getenv("SERVER_PORT", "8000"))
 
+    cli = BuyerCLI(server_host, server_port)
+    cli.run()
 
-
-# cli with menu options/arg options
-
-# Example:
-# option chosen - create account
-# calls create account function
+if __name__ == "__main__":
+    main()
+    
