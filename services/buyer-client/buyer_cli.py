@@ -45,6 +45,7 @@ active session.
 """
 
 import os
+
 from api_client import BuyerAPIClient
 from session import BuyerSession
 
@@ -55,21 +56,21 @@ class BuyerCLI:
     def __init__(self, server_host: str = "buyer-server", server_port: int = 6000):
         self.api_client = BuyerAPIClient(server_host, server_port)
         self.session = BuyerSession()
-  
+
     def display_authentication_menu(self):
         """Display main menu for logged-out users"""
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("BUYER - E-Commerce System")
-        print("="*50)
+        print("=" * 50)
         print("1. Create Account")
         print("2. Login")
         print("3. Exit")
-        print("="*50)
-    
+        print("=" * 50)
+
     def display_main_menu(self):
         """Display menu for logged-in buyers"""
-        print("\n" + "="*50)
-        print("="*50)
+        print("\n" + "=" * 50)
+        print("=" * 50)
         print("1. Search Items for Sale")
         print("2. Get Item")
         print("3. Add Item to Cart")
@@ -82,8 +83,8 @@ class BuyerCLI:
         print("10. Get Seller Rating")
         print("11. Get Buyer Purchases")
         print("12. Logout")
-        print("="*50)
- 
+        print("=" * 50)
+
     def handle_create_account(self):
         """Handle account creation"""
         print("\n--- Create Account ---")
@@ -91,19 +92,19 @@ class BuyerCLI:
         if not username:
             print("Error: Username cannot be empty")
             return
-        
+
         password = input("Enter password: ").strip()
         if not password:
             print("Error: Password cannot be empty")
             return
-        
+
         response = self.api_client.create_account(username, password)
-        
+
         if response.get("status") == "OK":
             print(f"Your Buyer ID: {response.get('buyer_id')}")
         else:
             print(f"Error: {response.get('message', 'Unknown error')}")
-    
+
     def handle_login(self):
         """Handle buyer login"""
         print("\n--- Login ---")
@@ -111,39 +112,41 @@ class BuyerCLI:
         if not username:
             print("Error: Username cannot be empty")
             return
-        
+
         password = input("Enter password: ").strip()
         if not password:
             print("Error: Password cannot be empty")
             return
-        
+
         response = self.api_client.login(username, password)
-        
+
         if response.get("status") == "OK":
             self.session.session_id = response.get("session_id")
             self.session.buyer_id = response.get("buyer_id")
             print(f"{response.get('message')}")
         else:
             print(f"Error: {response.get('message', 'Login failed')}")
-    
+
     def handle_logout(self):
         """Handle buyer logout"""
         response = self.api_client.logout(self.session)
-        
+
         if response.get("status") == "OK":
             print(f"{response.get('message')}")
             self.session.clear()
         else:
             print(f"Error: {response.get('message', 'Logout failed')}")
-    
+
     def handle_search_items(self):
         """Handle search items for sale"""
 
         # Given an item category and up to five keywords, return
-# available items (and their attributes) for sale.
+        # available items (and their attributes) for sale.
         print("\n--- Search Items for Sale ---")
         category = input("Enter item category: ").strip()
-        keywords = input("Enter up to five keywords (comma-separated): ").strip().split(",")
+        keywords = (
+            input("Enter up to five keywords (comma-separated): ").strip().split(",")
+        )
         pass
 
     def handle_get_item(self):
@@ -183,7 +186,26 @@ class BuyerCLI:
 
     def handle_add_item_to_cart(self):
         """Handle add item to cart"""
-        pass
+        print("\n--- Add Item To Cart ---")
+
+        try:
+            item_id = int(input("Item ID: ").strip())
+            quantity = int(input("Quality: ").strip())
+
+            response = self.api_client.add_item_to_cart(self.session, item_id, quantity)
+
+            if response.get("status") == "OK":
+                print(f"{response.get('message')}")
+            elif response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
+            else:
+                print(
+                    f"Error: {response.get('message', 'Could not add item to active cart')}"
+                )
+
+        except ValueError as e:
+            print(f"Error: Invalid input : {str(e)}")
 
     def handle_remove_item_from_cart(self):
         """Handle remove item from cart"""
@@ -254,11 +276,13 @@ class BuyerCLI:
     def run(self):
         """Main CLI loop"""
         print("\nBuyer Client initialised successfully!")
-        print(f"API Server: {self.api_client.server_host}:{self.api_client.server_port}")
+        print(
+            f"API Server: {self.api_client.server_host}:{self.api_client.server_port}"
+        )
 
         while True:
             try:
-                if not self.session.is_active():
+                if not self.session.session_id:
                     self.display_authentication_menu()
                     choice = input("Select an option: ").strip()
 
@@ -306,7 +330,7 @@ class BuyerCLI:
                 break
             except Exception as e:
                 print(f"Error: {str(e)}")
-    
+
 
 def main():
     """Entry point for buyer CLI"""
@@ -315,6 +339,7 @@ def main():
 
     cli = BuyerCLI(server_host, server_port)
     cli.run()
+
 
 if __name__ == "__main__":
     main()

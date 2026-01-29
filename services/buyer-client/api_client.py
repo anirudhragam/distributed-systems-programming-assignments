@@ -91,7 +91,7 @@ class BuyerAPIClient:
         return response
 
     def add_item_to_cart(self, session: BuyerSession, item_id: int, quantity: int):
-        """Function to send TCP request to add items to cart"""
+        """Function to send TCP request to add items to active cart"""
         payload = {
             "operation": "AddItemToCart",
             "session_id": session.session_id,
