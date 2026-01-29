@@ -42,7 +42,7 @@ services:
       timeout: 5s
       retries: 5
 
-  sreller-client:
+  seller-client:
     build:
       context: ./services/seller-client
       dockerfile: Dockerfile
@@ -50,7 +50,7 @@ services:
     depends_on:
       - seller-server
     environment:
-      SERVER_HOST: seller-serve
+      SERVER_HOST: seller-server
       SERVER_PORT: 5000
     stdin_open: true
     tty: true
@@ -76,6 +76,42 @@ services:
     tty: true
     networks:
       - distributed_network
+
+  buyer-client:
+    build:
+      context: ./services/buyer-client
+      dockerfile: Dockerfile
+    container_name: buyer_client_container
+    depends_on:
+      - buyer-server
+    environment:
+      SERVER_HOST: buyer-server
+      SERVER_PORT: 6000
+    stdin_open: true
+    tty: true
+    networks:
+      - distributed_network
+
+  buyer-server:
+    build:
+      context: ./services/buyer-server
+      dockerfile: Dockerfile
+    container_name: buyer_server_container
+    depends_on:
+      product-db:
+        condition: service_healthy
+      customer-db:
+        condition: service_healthy
+    ports:
+      - "6001:6000"
+    environment:
+      SERVER_HOST: 0.0.0.0 # Listen on all interfaces
+      SERVER_PORT: 6000
+    stdin_open: true
+    tty: true
+    networks:
+      - distributed_network
+
 
 volumes:
   product_db_data:

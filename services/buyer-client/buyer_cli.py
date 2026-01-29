@@ -52,7 +52,7 @@ from session import BuyerSession
 class BuyerCLI:
     """Interactive CLI for buyers"""
 
-    def __init__(self, server_host: str = "buyer-server", server_port: int = 8000):
+    def __init__(self, server_host: str = "buyer-server", server_port: int = 6000):
         self.api_client = BuyerAPIClient(server_host, server_port)
         self.session = BuyerSession()
   
@@ -100,8 +100,7 @@ class BuyerCLI:
         response = self.api_client.create_account(username, password)
         
         if response.get("status") == "OK":
-            print(f"{response.get('message')}")
-            print(f"  Your Buyer ID: {response.get('buyer_id')}")
+            print(f"Your Buyer ID: {response.get('buyer_id')}")
         else:
             print(f"Error: {response.get('message', 'Unknown error')}")
     
@@ -260,11 +259,10 @@ class BuyerCLI:
 def main():
     """Entry point for buyer CLI"""
     server_host = os.getenv("SERVER_HOST", "buyer-server")
-    server_port = int(os.getenv("SERVER_PORT", "8000"))
+    server_port = int(os.getenv("SERVER_PORT", "6000"))
 
     cli = BuyerCLI(server_host, server_port)
     cli.run()
 
 if __name__ == "__main__":
     main()
-    

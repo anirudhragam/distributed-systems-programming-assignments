@@ -8,7 +8,6 @@ CREATE TABLE sellers (
   thumbs_up INTEGER DEFAULT 0,
   thumbs_down INTEGER DEFAULT 0,
   items_sold INTEGER DEFAULT 0,
-  updated_at TIMESTAMP DEFAULT NOW() -- Move to Sessions table
 );
 
 -- Buyers Table
@@ -17,7 +16,7 @@ CREATE TABLE buyers (
   username VARCHAR(32) NOT NULL,
   passwd VARCHAR(32) NOT NULL, 
   items_purchased INTEGER DEFAULT 0,
-  updated_at TIMESTAMP DEFAULT NOW() -- Move to Sessions table
+  saved_cart_id UUID NOT NULL
 );
 
 -- Seller Sessions Table
@@ -31,15 +30,39 @@ CREATE TABLE seller_sessions (
 CREATE TABLE buyer_sessions (
   session_id UUID PRIMARY KEY,
   buyer_id INTEGER NOT NULL,
-  last_active_at TIMESTAMP DEFAULT NOW()
+  last_active_at TIMESTAMP DEFAULT NOW(),
+  active_cart_id UUID NOT NULL
 );
+
+-- Active Carts Table
+CREATE TABLE active_carts (
+  active_cart_id UUID PRIMARY KEY,
+  session_id UUID NOT NULL,
+  active_cart_items INT[] DEFAULT '{}'
+);
+
+-- Active Carts Table
+CREATE TABLE saved_carts (
+  saved_cart_id UUID PRIMARY KEY,
+  buyer_id INTEGER NOT NULL,
+  saved_cart_items INT[] DEFAULT '{}'
+);
+
 
 -- Add foreign key constraints to buyer and seller session tables
 ALTER TABLE seller_sessions ADD CONSTRAINT fk_seller_session 
   FOREIGN KEY (seller_id) REFERENCES sellers(seller_id) 
   ON DELETE CASCADE;
 
+ALTER TABLE active_carts ADD CONSTRAINT fk_session_id 
+  FOREIGN KEY (session_id) REFERENCES buyer_sessions(session_id) 
+  ON DELETE CASCADE;
+
 ALTER TABLE buyer_sessions ADD CONSTRAINT fk_buyer_session 
+  FOREIGN KEY (buyer_id) REFERENCES buyers(buyer_id) 
+  ON DELETE CASCADE;
+
+ALTER TABLE saved_carts ADD CONSTRAINT fk_buyer_id 
   FOREIGN KEY (buyer_id) REFERENCES buyers(buyer_id) 
   ON DELETE CASCADE;
 
@@ -48,6 +71,8 @@ CREATE INDEX idx_sellers_username ON sellers(username);
 CREATE INDEX idx_buyers_username ON buyers(username);
 CREATE INDEX idx_sellers_last_accessed ON seller_sessions(last_active_at);
 CREATE INDEX idx_buyers_last_accessed ON buyer_sessions(last_active_at);
+CREATE INDEX idx_active_carts_session_id ON active_carts(session_id);
+CREATE INDEX idx_saved_carts_buyer_id ON saved_carts(buyer_id);
 
 -- Sample data for sellers
 INSERT INTO sellers (username, passwd, thumbs_up, thumbs_down, items_sold)
@@ -71,8 +96,8 @@ Table: carts
 This table links the shopping journey to a specific user.
 | Column | Type | Description |
 | :--- | :--- | :--- |
-| id | UUID | Primary Key. |
-| user_id | UUID | Foreign Key to the User Profile Table. |
+| BUYER_ID | INT | Primary Key. |
+| CART_ID | UUID | Foreign Key to the User Profile Table. |
 | created_at | Timestamp | Initial creation time. |
 | updated_at | Timestamp | Used for tracking session activity. | 
 
