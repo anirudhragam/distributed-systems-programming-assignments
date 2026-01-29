@@ -221,7 +221,27 @@ class BuyerCLI:
 
     def handle_display_cart(self):
         """Handle display cart"""
-        pass
+        try:
+            response = self.api_client.display_cart(self.session)
+
+            if response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
+
+            elif response.get("status") == "OK":
+                cart_items = response.get("cart_items", {})
+                if not cart_items:
+                    print("Your active shopping cart is empty.")
+                else:
+                    print("\n--- Active Shopping Cart ---")
+                    for item_id, quantity in cart_items.items():
+                        print(f"Item ID: {item_id}, Quantity: {quantity}")
+                    print()
+            else:
+                print(f"Error: {response.get('message', 'Could not retrieve cart')}")
+        
+        except Exception as e:
+            print(f"Error retrieving cart: {e}")
 
     def handle_make_purchase(self):
         """To be implemented in future. Handle make purchase"""

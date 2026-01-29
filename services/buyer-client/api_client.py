@@ -137,7 +137,6 @@ class BuyerAPIClient:
         payload = {
             "operation": "DisplayCart",
             "session_id": session.session_id,
-            "buyer_id": session.buyer_id
         }
         response = self.send_message_with_reconnect(payload)
         return response

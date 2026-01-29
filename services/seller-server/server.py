@@ -293,11 +293,6 @@ class SellerServer:
             if new_quantity < 0:
                 return {"status": "Error", "message": "Available units cannot be negative."}
             
-            if new_quantity == 0:
-                cursor.execute("DELETE FROM products WHERE item_id = %s AND seller_id = %s", (item_id, int(seller_id)))
-                product_db_conn.commit()
-                return {"status": "OK", "message": f"New quantity for item {item_id} is zero. Item has been removed from sale."}
-            
             # Update the item quantity
             cursor.execute("UPDATE products SET quantity = %s WHERE item_id = %s AND seller_id = %s", (new_quantity, item_id, int(seller_id)))
             product_db_conn.commit()
@@ -320,7 +315,7 @@ class SellerServer:
 
         try:
             cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
-            cursor.execute("SELECT item_id, item_name, category, keywords, condition, sale_price::float, quantity, thumbs_up, thumbs_down FROM products WHERE seller_id = %s", (seller_id,))
+            cursor.execute("SELECT item_id, item_name, category, keywords, condition, sale_price::float, quantity, thumbs_up, thumbs_down FROM products WHERE seller_id = %s AND quantity > 0", (seller_id,))
             items = cursor.fetchall()
             if not items:
                 return {"status": "OK", "message": "No items for sale."}

@@ -385,7 +385,34 @@ class BuyerServer:
         pass
 
     def display_cart(self, payload: dict):
-        pass
+        """Function to display the active cart associate with the user's session"""
+        # Check if session is valid
+        session_id = payload.get("session_id")
+        if not self.check_if_session_valid(session_id):
+            return {
+                "status": "Timeout",
+                "message": "Session expired. Your active cart is empty. Please log in again.",
+            }
+
+        # Get a connection from the customer DB pool
+        customer_db_conn = self.customer_db_pool.getconn()
+        try:
+            cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+
+            cursor.execute(
+                "SELECT active_cart_items FROM active_carts WHERE session_id = %s",
+                (session_id,),
+            )
+            result = cursor.fetchone()
+            if not result:
+                return {"status": "Error", "message": "Cart does not exist for this session."}
+
+            cart_items = result["active_cart_items"]
+            return {"status": "OK", "cart_items": cart_items}
+        except Exception as e:
+            print(f"Error displaying cart: {e}")
+        finally:
+            self.customer_db_pool.putconn(customer_db_conn)
 
     def make_purchase(self, payload: dict):
         pass
