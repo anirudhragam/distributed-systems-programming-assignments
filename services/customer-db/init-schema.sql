@@ -38,14 +38,14 @@ CREATE TABLE buyer_sessions (
 CREATE TABLE active_carts (
   active_cart_id UUID PRIMARY KEY,
   session_id UUID NOT NULL,
-  active_cart_items INT[] DEFAULT '{}'
+  active_cart_items JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
 -- Active Carts Table
 CREATE TABLE saved_carts (
   saved_cart_id UUID PRIMARY KEY,
   buyer_id INTEGER NOT NULL,
-  saved_cart_items INT[] DEFAULT '{}'
+  saved_cart_items JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
 
