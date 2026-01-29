@@ -148,20 +148,38 @@ class BuyerCLI:
 
     def handle_get_item(self):
         """Handle get item by id"""
-        # called when user selects get item option on the cli menu
+        try:
+            item_id = int(input("Item ID: ").strip())
+            response = self.api_client.get_item(self.session, item_id)
 
-        # cli sends item id to api client
+            if response.get('status') == 'Timeout':
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
 
-        # api client opens a tcp connection passing item id to server
+            elif response.get('status') == 'Error':
+                if response.get('message') == 'Item not found.':
+                    print(f"Error: Item with ID {item_id} not found.")
+                else:
+                    print(f"Error: {response.get('message', 'Unknown error')}")
 
-        # server queries product db for item id
+            elif response.get('status') == 'OK':
+                item = response.get('item')
+                print("\n--- Item Details ---")
+                print(f"Item ID: {item['item_id']}")
+                print(f"  Name: {item['item_name']}")
+                print(f"  Seller ID: {item['seller_id']}")
+                print(f"  Category: {item['category']}")
+                print(f"  Keywords: {', '.join(item['keywords'])}")
+                print(f"  Condition: {item['condition']}")
+                print(f"  Price: ${item['sale_price']}")
+                print(f"  Quantity: {item['quantity']}")
+                print(f"  Thumbs Up: {item['thumbs_up']}")
+                print(f"  Thumbs Down: {item['thumbs_down']}")
+                print()
 
-        # server returns results to api client
+        except ValueError as e:
+            print(f"Error: Invalid input : {str(e)}")
 
-        # api client returns results to cli
-
-        # cli displays results
-        pass
 
     def handle_add_item_to_cart(self):
         """Handle add item to cart"""
@@ -189,11 +207,45 @@ class BuyerCLI:
 
     def handle_provide_feedback(self):
         """Handle provide feedback for item"""
-        pass
+        try:
+            item_id = int(input("Item ID: ").strip())
+            feedback = input("Feedback (1 for thumbs up, 0 for thumbs down): ").strip()
+            if feedback not in ["0", "1"]:
+                print("Error: Invalid feedback. Please enter 1 for thumbs up or 0 for thumbs down.")
+                return
+            
+            response = self.api_client.provide_feedback(self.session, item_id, int(feedback))
+
+            if response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
+
+            elif response.get("status") == "OK":
+                print(f"Feedback submitted successfully for item {item_id}")
+                
+            else:
+                print(f"Error: {response.get('message', 'Failed to submit feedback')}")
+
+        except ValueError:
+            print("Error: Invalid input.")
 
     def handle_get_seller_rating(self):
         """Handle get seller rating"""
-        pass
+        try:
+            seller_id = int(input("Seller ID: ").strip())
+            response = self.api_client.get_seller_rating(self.session, seller_id)
+
+            if response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
+
+            if response.get("status") == "OK":
+                print(f"Rating for seller {seller_id}: Thumbs Up: {response.get('thumbs_up')}, Thumbs Down: {response.get('thumbs_down')}")
+                
+            else:
+                print(f"Error: {response.get('message', 'Failed to retrieve seller rating')}")
+        except ValueError:
+            print("Error: Invalid seller ID.")
 
     def handle_get_buyer_purchases(self):
         """Handle get buyer purchase history"""

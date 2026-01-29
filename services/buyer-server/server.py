@@ -2,7 +2,6 @@ import os
 import socket
 import threading
 import uuid
-from hmac import new
 
 from psycopg2 import _psycopg, extensions, extras, pool
 
@@ -15,7 +14,7 @@ DEC2FLOAT = extensions.new_type(_psycopg.DECIMAL.values, "DEC2FLOAT", extensions
 class BuyerServer:
     """Server for serving API requests for the buyer API client"""
 
-    def __init__(self, server_host: str = "localhost", server_port: int = 6000):
+    def __init__(self, server_host: str = "buyer-server", server_port: int = 6000):
         self.server_host = server_host
         self.server_port = server_port
         self.socket = self.listen()
@@ -77,9 +76,10 @@ class BuyerServer:
                 return {"status": "Error", "message": "Username already exists."}
 
             # Insert new buyer into the database
+            saved_cart_id = str(uuid.uuid4())
             cursor.execute(
-                "INSERT INTO buyers (username, passwd) VALUES (%s, %s) RETURNING buyer_id",
-                (username, password),
+                "INSERT INTO buyers (username, passwd, saved_cart_id) VALUES (%s, %s, %s) RETURNING buyer_id",
+                (username, password, saved_cart_id),
             )
             buyer_id = cursor.fetchone()["buyer_id"]
             customer_db_conn.commit()
@@ -116,11 +116,16 @@ class BuyerServer:
 
             # Create a new session and add it to the buyer_sessions table
             session_id = str(uuid.uuid4())
+            active_cart_id = str(uuid.uuid4())
+            # Create a new session for buyer
             cursor.execute(
-                "INSERT INTO buyer_sessions (session_id, buyer_id) VALUES (%s, %s)",
-                (session_id, buyer_id),
+                "INSERT INTO buyer_sessions (session_id, buyer_id, active_cart_id) VALUES (%s, %s, %s)",
+                (session_id, buyer_id, active_cart_id),
             )
-
+            # Create a new active cart for session
+            cursor.execute(
+                "INSERT INTO active_carts (active_cart_id, session_id) VALUES (%s, %s)", (active_cart_id, session_id)
+            )
             customer_db_conn.commit()
             return {
                 "status": "OK",
@@ -197,7 +202,32 @@ class BuyerServer:
         pass
 
     def get_item(self, payload: dict):
-        pass
+        """Function to get attributes of a specific item by item ID"""
+        # Check if session is valid
+        session_id = payload.get("session_id")
+        if not self.check_if_session_valid(session_id):
+            return {"status": "Timeout", "message": "Session expired. Please log in again."}
+        
+        item_id = payload.get("item_id")
+
+        # Get a connection from the product DB pool
+        product_db_conn = self.product_db_pool.getconn()
+
+        try:
+            cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+            # Query item by item_id
+            cursor.execute("SELECT * FROM products WHERE item_id = %s", (item_id,))
+            
+            result = cursor.fetchone()
+            if not result:
+                return {"status": "Error", "message": "Item not found."}
+            
+            return {"status": "OK", "item": dict(result)}
+        except Exception as e:
+            print(f"Error getting item details: {e}")
+            return {"status": "Error", "message": "Failed to get item details."}
+        finally:
+            self.product_db_pool.putconn(product_db_conn)
 
     def add_item_to_cart(self, payload: dict):
         pass
@@ -218,10 +248,101 @@ class BuyerServer:
         pass
 
     def provide_feedback(self, payload: dict):
-        pass
+        """Functionn to provide feedback (thumbs up or thumbs down) for an item and accordingly update seller feedback"""
+        # Check if session is valid
+        session_id = payload.get("session_id")
+        if not self.check_if_session_valid(session_id):
+            return {"status": "Timeout", "message": "Session expired. Please log in again."}
+        
+        item_id = payload.get("item_id")
+        feedback = payload.get("feedback")  # Expecting 0 or 1
+        if feedback not in [0, 1]:
+            return {"status": "Error", "message": "Invalid feedback value. Must be 0 or 1."}
+        
+        # Get a connection from the product DB pool
+        product_db_conn = self.product_db_pool.getconn()
+        # Get a connection from the customer DB pool
+        customer_db_conn = self.customer_db_pool.getconn()
+
+        try:
+            product_cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+            customer_cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+            # Query item to get seller_id
+            product_cursor.execute("SELECT seller_id FROM products WHERE item_id = %s", (item_id,))
+            item_result = product_cursor.fetchone()
+            if not item_result:
+                return {"status": "Error", "message": f"Item with ID {item_id} not found."}
+            
+            seller_id = item_result["seller_id"]
+            # Update seller feedback
+            if feedback == 1:
+                product_cursor.execute(
+                    "UPDATE products SET thumbs_up = thumbs_up + 1 WHERE item_id = %s",
+                    (item_id,),
+                )
+                customer_cursor.execute(
+                    "UPDATE sellers SET thumbs_up = thumbs_up + 1 WHERE seller_id = %s",
+                    (seller_id,),
+                )
+            else:
+                product_cursor.execute(
+                    "UPDATE products SET thumbs_down = thumbs_down + 1 WHERE item_id = %s",
+                    (item_id,),
+                )
+                customer_cursor.execute(
+                    "UPDATE sellers SET thumbs_down = thumbs_down + 1 WHERE seller_id = %s",
+                    (seller_id,),
+                )
+
+            product_db_conn.commit()
+            customer_db_conn.commit()
+
+            return {"status": "OK", "message": "Feedback recorded successfully."}
+        
+        except Exception as e:
+            print(f"Error providing feedback: {e}")
+            return {"status": "Error", "message": "Failed to provide feedback."}
+        
+        finally:
+            self.product_db_pool.putconn(product_db_conn)
+            self.customer_db_pool.putconn(customer_db_conn)
+
 
     def get_seller_rating(self, payload: dict):
-        pass
+        """Function to get the seller rating for the given seller ID"""
+        # Check if session is valid
+        session_id = payload.get("session_id")
+        if not self.check_if_session_valid(session_id):
+            return {"status": "Timeout", "message": "Session expired. Please log in again."}
+        
+        seller_id = payload.get("seller_id")
+
+        # Get a connection from the customer DB pool
+        customer_db_conn = self.customer_db_pool.getconn()
+
+        try:
+            cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+            # Query seller by seller_id
+            cursor.execute(
+                "SELECT thumbs_up, thumbs_down FROM sellers WHERE seller_id = %s",
+                (seller_id,),
+            )
+            
+            result = cursor.fetchone()
+            if not result:
+                return {"status": "Error", "message": "Seller not found."}
+            
+            return {
+                "status": "OK",
+                "thumbs_up": result["thumbs_up"],
+                "thumbs_down": result["thumbs_down"],
+            }
+        except Exception as e:
+            print(f"Error getting seller rating: {e}")
+            return {"status": "Error", "message": "Failed to get seller rating."}
+        finally:
+            self.customer_db_pool.putconn(customer_db_conn)
+        
 
     def get_buyer_purchases(self, payload: dict):
         pass
@@ -299,7 +420,7 @@ class BuyerServer:
 
 def main():
     """Entry point for the buyer server"""
-    server_host = os.getenv("SERVER_HOST", "localhost")
+    server_host = os.getenv("SERVER_HOST", "buyer-server")
     server_port = int(os.getenv("SERVER_PORT", "6000"))
 
     server = BuyerServer(server_host, server_port)

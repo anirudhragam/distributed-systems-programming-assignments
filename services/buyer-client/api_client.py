@@ -146,13 +146,13 @@ class BuyerAPIClient:
         # To be implemented in future
         pass
 
-    def provide_feedback(self, session: BuyerSession, item_id: int, feedback_type: str):
+    def provide_feedback(self, session: BuyerSession, item_id: int, feedback: int):
         """Function to send TCP request to provide feedback (a thumbs up or thumbs down) for an item"""
         payload = {
             "operation": "ProvideFeedback",
             "session_id": session.session_id,
             "item_id": item_id,
-            "feedback_type": feedback_type
+            "feedback": feedback    
         }
         response = self.send_message_with_reconnect(payload)
         return response
