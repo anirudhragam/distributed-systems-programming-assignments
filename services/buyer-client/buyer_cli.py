@@ -328,7 +328,7 @@ class BuyerCLI:
                 print(f"Error: {response.get('message', 'Session timed out')}")
                 self.session.clear()
 
-            if response.get("status") == "OK":
+            elif response.get("status") == "OK":
                 print(
                     f"Rating for seller {seller_id}: Thumbs Up: {response.get('thumbs_up')}, Thumbs Down: {response.get('thumbs_down')}"
                 )
@@ -341,8 +341,17 @@ class BuyerCLI:
             print("Error: Invalid seller ID.")
 
     def handle_get_buyer_purchases(self):
-        """Handle get buyer purchase history"""
-        pass
+        """Handle get buyer purchase history. Stub implementation."""
+        response = self.api_client.get_buyer_purchases(self.session)
+
+        if response.get("status") == "Timeout":
+            print(f"Error: {response.get('message', 'Session timed out')}")
+            self.session.clear()
+
+        elif response.get("status") == "OK":
+            print("You have no purchase history.")
+        else:
+            print(f"Error: {response.get('message', 'Could not retrieve purchase history')}")
 
     def run(self):
         """Main CLI loop"""
