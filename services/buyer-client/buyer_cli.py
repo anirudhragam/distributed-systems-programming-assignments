@@ -155,18 +155,18 @@ class BuyerCLI:
             item_id = int(input("Item ID: ").strip())
             response = self.api_client.get_item(self.session, item_id)
 
-            if response.get('status') == 'Timeout':
+            if response.get("status") == "Timeout":
                 print(f"Error: {response.get('message', 'Session timed out')}")
                 self.session.clear()
 
-            elif response.get('status') == 'Error':
-                if response.get('message') == 'Item not found.':
+            elif response.get("status") == "Error":
+                if response.get("message") == "Item not found.":
                     print(f"Error: Item with ID {item_id} not found.")
                 else:
                     print(f"Error: {response.get('message', 'Unknown error')}")
 
-            elif response.get('status') == 'OK':
-                item = response.get('item')
+            elif response.get("status") == "OK":
+                item = response.get("item")
                 print("\n--- Item Details ---")
                 print(f"Item ID: {item['item_id']}")
                 print(f"  Name: {item['item_name']}")
@@ -182,7 +182,6 @@ class BuyerCLI:
 
         except ValueError as e:
             print(f"Error: Invalid input : {str(e)}")
-
 
     def handle_add_item_to_cart(self):
         """Handle add item to cart"""
@@ -209,15 +208,51 @@ class BuyerCLI:
 
     def handle_remove_item_from_cart(self):
         """Handle remove item from cart"""
-        pass
+        print("\n--- Remove Item From Cart ---")
+
+        try:
+            item_id = int(input("Item ID: ").strip())
+            quantity = int(input("Quality: ").strip())
+
+            response = self.api_client.remove_item_from_cart(
+                self.session, item_id, quantity
+            )
+
+            if response.get("status") == "OK":
+                print(f"{response.get('message')}")
+            elif response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
+            else:
+                print(
+                    f"Error: {response.get('message', 'Could not remove item from active cart')}"
+                )
+        except ValueError as e:
+            print(f"Error: Invalid input : {str(e)}")
 
     def handle_save_cart(self):
         """Handle save cart"""
-        pass
+        response = self.api_client.save_cart(self.session)
+
+        if response.get("status") == "OK":
+            print(f"{response.get('message')}")
+        elif response.get("status") == "Timeout":
+            print(f"Error: {response.get('message', 'Session timed out')}")
+            self.session.clear()
+        else:
+            print(f"Error: {response.get('message', 'Could not save active cart')}")
 
     def handle_clear_cart(self):
         """Handle clear cart"""
-        pass
+        response = self.api_client.clear_cart(self.session)
+
+        if response.get("status") == "OK":
+            print(f"{response.get('message')}")
+        elif response.get("status") == "Timeout":
+            print(f"Error: {response.get('message', 'Session timed out')}")
+            self.session.clear()
+        else:
+            print(f"Error: {response.get('message', 'Could not clear active cart')}")
 
     def handle_display_cart(self):
         """Handle display cart"""
@@ -245,7 +280,15 @@ class BuyerCLI:
 
     def handle_make_purchase(self):
         """To be implemented in future. Handle make purchase"""
-        pass
+        response = self.api_client.make_purchase(self.session)
+
+        if response.get("status") == "OK":
+            print(f"{response.get('message')}")
+        elif response.get("status") == "Timeout":
+            print(f"Error: {response.get('message', 'Session timed out')}")
+            self.session.clear()
+        else:
+            print(f"Error: {response.get('message', 'Could not complete purchase')}")
 
     def handle_provide_feedback(self):
         """Handle provide feedback for item"""
@@ -253,10 +296,14 @@ class BuyerCLI:
             item_id = int(input("Item ID: ").strip())
             feedback = input("Feedback (1 for thumbs up, 0 for thumbs down): ").strip()
             if feedback not in ["0", "1"]:
-                print("Error: Invalid feedback. Please enter 1 for thumbs up or 0 for thumbs down.")
+                print(
+                    "Error: Invalid feedback. Please enter 1 for thumbs up or 0 for thumbs down."
+                )
                 return
-            
-            response = self.api_client.provide_feedback(self.session, item_id, int(feedback))
+
+            response = self.api_client.provide_feedback(
+                self.session, item_id, int(feedback)
+            )
 
             if response.get("status") == "Timeout":
                 print(f"Error: {response.get('message', 'Session timed out')}")
@@ -264,7 +311,7 @@ class BuyerCLI:
 
             elif response.get("status") == "OK":
                 print(f"Feedback submitted successfully for item {item_id}")
-                
+
             else:
                 print(f"Error: {response.get('message', 'Failed to submit feedback')}")
 
@@ -282,10 +329,14 @@ class BuyerCLI:
                 self.session.clear()
 
             if response.get("status") == "OK":
-                print(f"Rating for seller {seller_id}: Thumbs Up: {response.get('thumbs_up')}, Thumbs Down: {response.get('thumbs_down')}")
-                
+                print(
+                    f"Rating for seller {seller_id}: Thumbs Up: {response.get('thumbs_up')}, Thumbs Down: {response.get('thumbs_down')}"
+                )
+
             else:
-                print(f"Error: {response.get('message', 'Failed to retrieve seller rating')}")
+                print(
+                    f"Error: {response.get('message', 'Failed to retrieve seller rating')}"
+                )
         except ValueError:
             print("Error: Invalid seller ID.")
 

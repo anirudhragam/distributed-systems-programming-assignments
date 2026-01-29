@@ -122,11 +122,24 @@ class BuyerServer:
                 "INSERT INTO buyer_sessions (session_id, buyer_id, active_cart_id) VALUES (%s, %s, %s)",
                 (session_id, buyer_id, active_cart_id),
             )
-            # Create a new active cart for session
+            # If buyer has a saved cardt, load it into the active cart
+            # else initialize an empty active cart
             cursor.execute(
-                "INSERT INTO active_carts (active_cart_id, session_id) VALUES (%s, %s)",
-                (active_cart_id, session_id),
+                "SELECT saved_cart_items FROM saved_carts WHERE saved_cart_id = (SELECT saved_cart_id FROM buyers WHERE buyer_id = %s)",
+                (buyer_id,),
             )
+            result = cursor.fetchone()
+            if result:
+                saved_cart_items = result["saved_cart_items"]
+                cursor.execute(
+                    "INSERT INTO active_carts (active_cart_id, active_cart_items) VALUES (%s, %s)",
+                    (active_cart_id, extras.Json(saved_cart_items)),
+                )
+            else:
+                cursor.execute(
+                    "INSERT INTO active_carts (active_cart_id, active_cart_items) VALUES (%s, %s)",
+                    (active_cart_id, extras.Json({})),
+                )
             customer_db_conn.commit()
             return {
                 "status": "OK",
@@ -150,7 +163,7 @@ class BuyerServer:
         try:
             cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
             # Delete the session from the buyer_sessions table
-            # Foreign key contraint will delete the active cart too
+            # Foreign key constraint will delete the active cart too
             cursor.execute(
                 "DELETE FROM buyer_sessions WHERE session_id = %s", (session_id,)
             )
@@ -178,7 +191,7 @@ class BuyerServer:
             print(f"Session check result: {result}")
             if not result:
                 # Session expired, delete from buyer_sessions table and return False
-                # Foreign key contraint will delete the active cart too
+                # Foreign key constraint will delete the active cart too
                 print("Deleting expired session")
                 cursor.execute(
                     "DELETE FROM buyer_sessions WHERE session_id = %s", (session_id,)
@@ -379,10 +392,101 @@ class BuyerServer:
             self.customer_db_pool.putconn(customer_db_conn)
 
     def save_cart(self, payload: dict):
-        pass
+        """Function to save the active cart as a saved cart for the buyer"""
+        # Check if session is valid
+        session_id = payload.get("session_id")
+
+        if not self.check_if_session_valid(session_id):
+            return {
+                "status": "Timeout",
+                "message": "Session expired. Please log in again.",
+            }
+
+        buyer_id = payload.get("buyer_id")
+
+        # Get a connection from the customer DB pool
+        customer_db_conn = self.customer_db_pool.getconn()
+        try:
+            cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+
+            # Get active cart items
+            cursor.execute(
+                "SELECT active_cart_items FROM active_carts WHERE session_id = %s",
+                (session_id,),
+            )
+            result = cursor.fetchone()
+            active_cart_items = result["active_cart_items"]
+
+            # Get saved cart ID for buyer
+            cursor.execute(
+                "SELECT saved_cart_id FROM buyers WHERE buyer_id = %s", (buyer_id,)
+            )
+            saved_cart_id = cursor.fetchone()["saved_cart_id"]
+
+            # Update saved cart with active cart items
+            cursor.execute(
+                "UPDATE saved_carts SET saved_cart_items = %s WHERE saved_cart_id = %s",
+                (extras.Json(active_cart_items), saved_cart_id),
+            )
+            customer_db_conn.commit()
+            return {
+                "status": "OK",
+                "message": "Cart saved successfully.",
+            }
+        except Exception as e:
+            print(f"Error saving cart: {e}")
+        finally:
+            self.customer_db_pool.putconn(customer_db_conn)
 
     def clear_cart(self, payload: dict):
-        pass
+        """Function to clear the saved cart"""
+        # Check if session is valid
+        session_id = payload.get("session_id")
+
+        if not self.check_if_session_valid(session_id):
+            return {
+                "status": "Timeout",
+                "message": "Session expired. Please log in again.",
+            }
+
+        buyer_id = payload.get("buyer_id")
+
+        # Get a connection from the customer DB pool
+        customer_db_conn = self.customer_db_pool.getconn()
+        try:
+            cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+
+            # Get saved cart ID for buyer
+            cursor.execute(
+                "SELECT saved_cart_id FROM buyers WHERE buyer_id = %s", (buyer_id,)
+            )
+            saved_cart_id = cursor.fetchone()["saved_cart_id"]
+            # Clear saved cart items
+            cursor.execute(
+                "UPDATE saved_carts SET saved_cart_items = '{}'::jsonb WHERE saved_cart_id = %s",
+                (saved_cart_id,),
+            )
+
+            # Get active cart ID for session
+            cursor.execute(
+                "SELECT active_cart_id FROM buyer_sessions WHERE session_id = %s",
+                (session_id,),
+            )
+            active_cart_id = cursor.fetchone()["active_cart_id"]
+            # Clear active cart items
+            cursor.execute(
+                "UPDATE active_carts SET active_cart_items = '{}'::jsonb WHERE active_cart_id = %s",
+                (active_cart_id,),
+            )
+            customer_db_conn.commit()
+            return {
+                "status": "OK",
+                "message": "Cart cleared successfully.",
+            }
+        except Exception as e:
+            print(f"Error clearing cart: {e}")
+        finally:
+            self.customer_db_pool.putconn(customer_db_conn)
 
     def display_cart(self, payload: dict):
         """Function to display the active cart associate with the user's session"""

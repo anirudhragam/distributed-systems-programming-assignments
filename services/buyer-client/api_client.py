@@ -125,7 +125,7 @@ class BuyerAPIClient:
     def clear_cart(self, session: BuyerSession):
         """Function to send TCP request to clear buyer's active shopping cart"""
         payload = {
-            "operation": "SaveCart",
+            "operation": "ClearCart",
             "session_id": session.session_id,
             "buyer_id": session.buyer_id
         }
