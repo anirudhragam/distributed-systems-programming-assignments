@@ -56,8 +56,7 @@ class SellerCLI:
         response = self.api_client.create_account(username, password)
         
         if response.get("status") == "OK":
-            print(f"{response.get('message')}")
-            print(f"  Your Seller ID: {response.get('seller_id')}")
+            print(f"Your Seller ID: {response.get('seller_id')}")
         else:
             print(f"Error: {response.get('message', 'Unknown error')}")
     
@@ -205,7 +204,7 @@ class SellerCLI:
             
             items = response.get("items", [])
             
-            if not items:
+            if not items and response.get("status") == "OK":
                 print(f"{response.get('message')}")
                 return
             

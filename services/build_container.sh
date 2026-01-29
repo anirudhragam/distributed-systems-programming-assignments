@@ -7,10 +7,6 @@ cp -r ../utils seller-server/utils
 
 cd ..
 
-# Stop and remove any existing containers and volumes
-echo "Cleaning up old containers..."
-docker-compose down -v 2>/dev/null || true
-
 # Run docker-compose
 docker-compose up -d --build
 # All services are up and running."

@@ -207,7 +207,7 @@ class SellerServer:
         seller_id = payload.get("seller_id")
 
         if not self.check_if_session_valid(session_id):
-            return {"status": "Error", "message": "Session expired. Please log in again."}
+            return {"status": "Timeout", "message": "Session expired. Please log in again."}
         
         item_name = payload.get("item_name")
         category = payload.get("category")
@@ -242,7 +242,7 @@ class SellerServer:
         seller_id = payload.get("seller_id")
 
         if not self.check_if_session_valid(session_id):
-            return {"status": "Error", "message": "Session expired. Please log in again."}
+            return {"status": "Timeout", "message": "Session expired. Please log in again."}
         
         item_id = payload.get("item_id")
         new_price = payload.get("new_price")
@@ -271,7 +271,7 @@ class SellerServer:
         seller_id = payload.get("seller_id")
 
         if not self.check_if_session_valid(session_id):
-            return {"status": "Error", "message": "Session expired. Please log in again."}
+            return {"status": "Timeout", "message": "Session expired. Please log in again."}
         
         item_id = payload.get("item_id")
         quantity_change = payload.get("quantity_change")
@@ -293,6 +293,11 @@ class SellerServer:
             if new_quantity < 0:
                 return {"status": "Error", "message": "Available units cannot be negative."}
             
+            if new_quantity == 0:
+                cursor.execute("DELETE FROM products WHERE item_id = %s AND seller_id = %s", (item_id, int(seller_id)))
+                product_db_conn.commit()
+                return {"status": "OK", "message": f"New quantity for item {item_id} is zero. Item has been removed from sale."}
+            
             # Update the item quantity
             cursor.execute("UPDATE products SET quantity = %s WHERE item_id = %s AND seller_id = %s", (new_quantity, item_id, int(seller_id)))
             product_db_conn.commit()
@@ -309,7 +314,7 @@ class SellerServer:
         seller_id = payload.get("seller_id")
 
         if not self.check_if_session_valid(session_id):
-            return {"status": "Error", "message": "Session expired. Please log in again."}
+            return {"status": "Timeout", "message": "Session expired. Please log in again."}
         # Get a connection from the product DB pool
         product_db_conn = self.product_db_pool.getconn()    
 
