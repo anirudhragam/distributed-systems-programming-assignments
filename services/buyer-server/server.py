@@ -75,13 +75,19 @@ class BuyerServer:
             if result:
                 return {"status": "Error", "message": "Username already exists."}
 
-            # Insert new buyer into the database
+            # Insert new buyer into the buyers table
             saved_cart_id = str(uuid.uuid4())
             cursor.execute(
                 "INSERT INTO buyers (username, passwd, saved_cart_id) VALUES (%s, %s, %s) RETURNING buyer_id",
                 (username, password, saved_cart_id),
             )
             buyer_id = cursor.fetchone()["buyer_id"]
+
+            # Insert new saved cart into the saved_carts table
+            cursor.execute(
+                "INSERT INTO saved_carts (saved_cart_id, buyer_id) VALUES (%s, %s)",
+                (saved_cart_id, buyer_id),
+            )
             customer_db_conn.commit()
             return {"status": "OK", "buyer_id": buyer_id}
         except Exception as e:
@@ -132,13 +138,13 @@ class BuyerServer:
             if result:
                 saved_cart_items = result["saved_cart_items"]
                 cursor.execute(
-                    "INSERT INTO active_carts (active_cart_id, active_cart_items) VALUES (%s, %s)",
-                    (active_cart_id, extras.Json(saved_cart_items)),
+                    "INSERT INTO active_carts (active_cart_id, session_id, active_cart_items) VALUES (%s, %s, %s)",
+                    (active_cart_id, session_id, extras.Json(saved_cart_items)),
                 )
             else:
                 cursor.execute(
-                    "INSERT INTO active_carts (active_cart_id, active_cart_items) VALUES (%s, %s)",
-                    (active_cart_id, extras.Json({})),
+                    "INSERT INTO active_carts (active_cart_id, session_id, active_cart_items) VALUES (%s, %s, %s)",
+                    (active_cart_id, session_id, extras.Json({})),
                 )
             customer_db_conn.commit()
             return {

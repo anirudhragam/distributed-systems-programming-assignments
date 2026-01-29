@@ -7,7 +7,7 @@ CREATE TABLE sellers (
   passwd VARCHAR(32) NOT NULL, 
   thumbs_up INTEGER DEFAULT 0,
   thumbs_down INTEGER DEFAULT 0,
-  items_sold INTEGER DEFAULT 0,
+  items_sold INTEGER DEFAULT 0
 );
 
 -- Buyers Table
@@ -83,13 +83,13 @@ VALUES
   ('Daily Deals', 'password4', 0, 0, 0);
 
 -- Sample data for buyers
-INSERT INTO buyers (username, passwd, items_purchased)
-VALUES 
-  ('John Doe', 'password1', 0),
-  ('Jane Smith', 'password2', 0),
-  ('Bob Johnson', 'password3', 0),
-  ('Alice Williams', 'password4', 0),
-  ('Charlie Brown', 'password5', 0);
+-- INSERT INTO buyers (username, passwd, items_purchased)
+-- VALUES 
+--   ('John Doe', 'password1', 0),
+--   ('Jane Smith', 'password2', 0),
+--   ('Bob Johnson', 'password3', 0),
+--   ('Alice Williams', 'password4', 0),
+--   ('Charlie Brown', 'password5', 0);
 
 /*
 Table: carts
