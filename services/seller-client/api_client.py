@@ -29,9 +29,6 @@ class SellerAPIClient:
                 send_message(self.connection, message)
                 response = recv_message(self.connection)
                 return response
-        else:
-            # handle this case
-            pass
         
 
     def connect(self):

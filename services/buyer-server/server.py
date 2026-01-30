@@ -221,7 +221,50 @@ class BuyerServer:
             self.customer_db_pool.putconn(customer_db_conn)
 
     def search_items(self, payload: dict):
-        pass
+        """Function to search for items for sale based on item category and keywords"""
+        # Check if session is valid
+        session_id = payload.get("session_id")
+        if not self.check_if_session_valid(session_id):
+            return {
+                "status": "Timeout",
+                "message": "Session expired. Please log in again.",
+            }
+
+        category = payload.get("category")
+        keywords = payload.get("keywords", [])
+
+        # Get a connection from the product DB pool
+        product_db_conn = self.product_db_pool.getconn()
+        try:
+            cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+            if not keywords:
+                # Query items by category only
+                cursor.execute(
+                    """
+                    SELECT * FROM products
+                    WHERE category = %s
+                    """,
+                    (category,),
+                )
+                results = cursor.fetchall()
+                return {"status": "OK", "items": results}
+
+            # Query items by category and keywords
+            cursor.execute(
+                """
+                SELECT * FROM products
+                WHERE category = %s
+                AND keywords && %s::varchar[]
+                """,
+                (category, keywords),
+            )
+            results = cursor.fetchall()
+            return {"status": "OK", "items": results}
+        except Exception as e:
+            print(f"Error searching items: {e}")
+            return {"status": "Error", "message": "Failed to search items."}
+        finally:
+            self.product_db_pool.putconn(product_db_conn)
 
     def get_item(self, payload: dict):
         """Function to get attributes of a specific item by item ID"""
@@ -515,7 +558,10 @@ class BuyerServer:
             )
             result = cursor.fetchone()
             if not result:
-                return {"status": "Error", "message": "Cart does not exist for this session."}
+                return {
+                    "status": "Error",
+                    "message": "Cart does not exist for this session.",
+                }
 
             cart_items = result["active_cart_items"]
             return {"status": "OK", "cart_items": cart_items}

@@ -26,9 +26,6 @@ class BuyerAPIClient:
                 send_message(self.connection, message)
                 response = recv_message(self.connection)
                 return response
-        else:
-            # handle this case
-            pass
         
     def connect(self):
         """Function to establish TCP connection to the seller server"""

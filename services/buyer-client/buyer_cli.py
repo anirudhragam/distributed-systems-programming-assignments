@@ -139,15 +139,51 @@ class BuyerCLI:
 
     def handle_search_items(self):
         """Handle search items for sale"""
-
         # Given an item category and up to five keywords, return
         # available items (and their attributes) for sale.
         print("\n--- Search Items for Sale ---")
-        category = input("Enter item category: ").strip()
-        keywords = (
-            input("Enter up to five keywords (comma-separated): ").strip().split(",")
-        )
-        pass
+
+        try:
+            category = int(input("Enter item category (integer): ").strip())
+            if category is None:
+                print("Error: Category cannot be empty")
+                return
+
+            keywords_input = input("Keywords (comma-separated, max 5): ").strip()
+            # convert keywords to lowercase for case-insensitive search
+            keywords = [
+                k.strip().lower() for k in keywords_input.split(",") if k.strip()
+            ]
+            if len(keywords) > 5:
+                print("Error: Maximum 5 keywords allowed")
+                return
+
+            response = self.api_client.search_items(self.session, category, keywords)
+            if response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
+            elif response.get("status") == "OK":
+                items = response.get("items", [])
+                if not items:
+                    print("No items found matching the search criteria.")
+                else:
+                    print("\n--- Search Results ---")
+                    for item in items:
+                        print(f"Item ID: {item['item_id']}")
+                        print(f"  Name: {item['item_name']}")
+                        print(f"  Seller ID: {item['seller_id']}")
+                        print(f"  Category: {item['category']}")
+                        print(f"  Keywords: {', '.join(item['keywords'])}")
+                        print(f"  Condition: {item['condition']}")
+                        print(f"  Price: ${item['sale_price']}")
+                        print(f"  Quantity: {item['quantity']}")
+                        print(f"  Thumbs Up: {item['thumbs_up']}")
+                        print(f"  Thumbs Down: {item['thumbs_down']}")
+                        print()
+            else:
+                print(f"Error: {response.get('message', 'Unknown error')}")
+        except ValueError as e:
+            print(f"Error: Invalid input : {str(e)}")
 
     def handle_get_item(self):
         """Handle get item by id"""
@@ -274,7 +310,7 @@ class BuyerCLI:
                     print()
             else:
                 print(f"Error: {response.get('message', 'Could not retrieve cart')}")
-        
+
         except Exception as e:
             print(f"Error retrieving cart: {e}")
 
@@ -351,7 +387,9 @@ class BuyerCLI:
         elif response.get("status") == "OK":
             print("You have no purchase history.")
         else:
-            print(f"Error: {response.get('message', 'Could not retrieve purchase history')}")
+            print(
+                f"Error: {response.get('message', 'Could not retrieve purchase history')}"
+            )
 
     def run(self):
         """Main CLI loop"""
