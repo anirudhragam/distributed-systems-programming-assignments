@@ -53,7 +53,7 @@ from session import BuyerSession
 class BuyerCLI:
     """Interactive CLI for buyers"""
 
-    def __init__(self, server_host: str = "buyer-server", server_port: int = 6000):
+    def __init__(self, server_host: str = "buyer_server", server_port: int = 6000):
         self.api_client = BuyerAPIClient(server_host, server_port)
         self.session = BuyerSession()
 
@@ -452,7 +452,7 @@ class BuyerCLI:
 
 def main():
     """Entry point for buyer CLI"""
-    server_host = os.getenv("SERVER_HOST", "buyer-server")
+    server_host = os.getenv("SERVER_HOST", "buyer_server")
     server_port = int(os.getenv("SERVER_PORT", "6000"))
 
     cli = BuyerCLI(server_host, server_port)

@@ -42,24 +42,24 @@ services:
       timeout: 5s
       retries: 5
 
-  seller-client:
+  seller_client:
     build:
-      context: ./services/seller-client
+      context: ./services/seller_client
       dockerfile: Dockerfile
     container_name: seller_client_container
     depends_on:
-      - seller-server
+      - seller_server
     environment:
-      SERVER_HOST: seller-server
+      SERVER_HOST: seller_server
       SERVER_PORT: 5000
     stdin_open: true
     tty: true
     networks:
       - distributed_network
 
-  seller-server:
+  seller_server:
     build:
-      context: ./services/seller-server
+      context: ./services/seller_server
       dockerfile: Dockerfile
     container_name: seller_server_container
     depends_on:
@@ -77,24 +77,24 @@ services:
     networks:
       - distributed_network
 
-  buyer-client:
+  buyer_client:
     build:
-      context: ./services/buyer-client
+      context: ./services/buyer_client
       dockerfile: Dockerfile
     container_name: buyer_client_container
     depends_on:
-      - buyer-server
+      - buyer_server
     environment:
-      SERVER_HOST: buyer-server
+      SERVER_HOST: buyer_server
       SERVER_PORT: 6000
     stdin_open: true
     tty: true
     networks:
       - distributed_network
 
-  buyer-server:
+  buyer_server:
     build:
-      context: ./services/buyer-server
+      context: ./services/buyer_server
       dockerfile: Dockerfile
     container_name: buyer_server_container
     depends_on:

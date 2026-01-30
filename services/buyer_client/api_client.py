@@ -7,7 +7,7 @@ from session import BuyerSession
 class BuyerAPIClient:
     """Client for making API calls to the buyer backend server"""
 
-    def __init__(self, server_host: str = "buyer-server", server_port: int = 6000):
+    def __init__(self, server_host: str = "buyer_server", server_port: int = 6000):
         self.server_host = server_host
         self.server_port = server_port
         self.connection = None

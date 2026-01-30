@@ -1,9 +1,9 @@
 #!/bin/bash
 
-cp -r ../utils buyer-client/utils
-cp -r ../utils seller-client/utils
-cp -r ../utils buyer-server/utils
-cp -r ../utils seller-server/utils
+cp -r ../utils buyer_client/utils
+cp -r ../utils seller_client/utils
+cp -r ../utils buyer_server/utils
+cp -r ../utils seller_server/utils
 
 cd ..
 
@@ -13,7 +13,7 @@ docker-compose up -d --build
 
 cd services
 
-rm -rf buyer-client/utils
-rm -rf seller-client/utils
-rm -rf buyer-server/utils
-rm -rf seller-server/utils
+rm -rf buyer_client/utils
+rm -rf seller_client/utils
+rm -rf buyer_server/utils
+rm -rf seller_server/utils

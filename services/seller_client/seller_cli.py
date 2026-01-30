@@ -14,8 +14,8 @@ from session import SellerSession
 
 class SellerCLI:
     """Interactive CLI for sellers"""
-
-    def __init__(self, server_host: str = "seller-server", server_port: int = 5000):
+    
+    def __init__(self, server_host: str = "seller_server", server_port: int = 5000):
         self.api_client = SellerAPIClient(server_host, server_port)
         self.session = SellerSession()
 
@@ -286,7 +286,7 @@ class SellerCLI:
 
 def main():
     """Entry point"""
-    server_host = os.getenv("SERVER_HOST", "seller-server")
+    server_host = os.getenv("SERVER_HOST", "seller_server")
     server_port = int(os.getenv("SERVER_PORT", "5000"))
 
     cli = SellerCLI(server_host, server_port)

@@ -14,7 +14,7 @@ DEC2FLOAT = extensions.new_type(_psycopg.DECIMAL.values, "DEC2FLOAT", extensions
 class BuyerServer:
     """Server for serving API requests for the buyer API client"""
 
-    def __init__(self, server_host: str = "buyer-server", server_port: int = 6000):
+    def __init__(self, server_host: str = "buyer_server", server_port: int = 6000):
         self.server_host = server_host
         self.server_port = server_port
         self.socket = self.listen()
@@ -763,7 +763,7 @@ class BuyerServer:
 
 def main():
     """Entry point for the buyer server"""
-    server_host = os.getenv("SERVER_HOST", "buyer-server")
+    server_host = os.getenv("SERVER_HOST", "buyer_server")
     server_port = int(os.getenv("SERVER_PORT", "6000"))
 
     server = BuyerServer(server_host, server_port)
