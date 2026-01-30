@@ -137,7 +137,7 @@ def run_buyer_operations(buyer_id: int):
 
             # Get item
             start = time.time()
-            response = client.get_item(session, item_id=i % 5)
+            response = client.get_item(session, item_id=(i % 5)+1)
             elapsed = (time.time() - start) * 1000
             response_times.append(elapsed)
 
@@ -274,5 +274,9 @@ if __name__ == "__main__":
 
     num_sellers = args.num_sellers
     num_buyers = args.num_buyers
+
+    run_experiments(num_sellers, num_buyers)
+
+
     
 
