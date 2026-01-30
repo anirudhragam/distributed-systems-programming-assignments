@@ -1,3 +1,4 @@
+import random
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -91,12 +92,111 @@ def run_seller_operations(seller_id: int):
         
     return response_times
 
-        
-
-
 
 def run_buyer_operations(buyer_id: int):
-    pass
+    response_times = []
+    try:
+        client = BuyerAPIClient(BUYER_SERVER, BUYER_PORT)
+
+        # Create unique credentials
+        username = f"buyer_{buyer_id}_{int(time.time() * 1000)}"
+        password = "password123"
+
+        # Create Account
+        start = time.time()
+        response = client.create_account(username, password)
+        elapsed = (time.time() - start) * 1000
+        response_times.append(elapsed)
+
+        if not response.get('status') == 'OK':
+            print(f"Buyer {buyer_id}: Failed to create account")
+            return response_times
+        
+        # Login
+        start = time.time()
+        response = client.login(username, password)
+        elapsed = (time.time() - start) * 1000
+        response_times.append(elapsed)
+        
+        if not response.get('status') == 'OK':
+            print(f"Buyer {buyer_id}: Failed to login")
+            return response_times
+        
+        session = BuyerSession()
+        session.buyer_id = response.get('buyer_id')
+        session.session_id = response.get('session_id')
+
+        # Search items, get item, add to cart, remove from cart, save cart, display cart, clear cart, provide feedback, get seller rating
+        # Repeat these operations until approximately 1000 operations are done
+        for i in range((1000 - 2) // 9): 
+            # Search items
+            start = time.time()
+            response = client.search_items(session, category=i % 5, keywords=["keyword1"])
+            elapsed = (time.time() - start) * 1000
+            response_times.append(elapsed)
+
+            # Get item
+            start = time.time()
+            response = client.get_item(session, item_id=i % 5)
+            elapsed = (time.time() - start) * 1000
+            response_times.append(elapsed)
+
+            if response.get("status") == "OK" and response.get("item"):
+                item_id = response.get("item").get("item_id")
+                # Provide feedback
+                start = time.time()
+                # random feedback between thumbs up (1) and thumbs down (0)
+                response = client.provide_feedback(session, item_id=item_id, feedback=random.choice([0, 1]))
+                elapsed = (time.time() - start) * 1000
+                response_times.append(elapsed)
+
+                # Add item to cart
+                start = time.time()
+                response = client.add_item_to_cart(session, item_id=item_id, quantity=1)
+                elapsed = (time.time() - start) * 1000
+                response_times.append(elapsed)
+
+                # Remove item from cart
+                start = time.time()
+                response = client.remove_item_from_cart(session, item_id=item_id, quantity=1)
+                elapsed = (time.time() - start) * 1000
+                response_times.append(elapsed)
+
+                seller_id = response.get("item").get("seller_id")
+                # Get seller rating
+                start = time.time()
+                response = client.get_seller_rating(session, seller_id=seller_id)
+                elapsed = (time.time() - start) * 1000
+                response_times.append(elapsed)
+
+            # Save cart
+            start = time.time()
+            response = client.save_cart(session)
+            elapsed = (time.time() - start) * 1000
+            response_times.append(elapsed)
+
+            # Display cart
+            start = time.time()
+            response = client.display_cart(session)
+            elapsed = (time.time() - start) * 1000
+            response_times.append(elapsed)
+
+            # Clear cart
+            start = time.time()
+            response = client.clear_cart(session)
+            elapsed = (time.time() - start) * 1000
+            response_times.append(elapsed)
+
+        # Logout
+        start = time.time()
+        response = client.logout(session)
+        elapsed = (time.time() - start) * 1000
+        response_times.append(elapsed)
+    
+    except Exception as e:
+            print(f"Buyer {buyer_id} error: {e}")
+        
+    return response_times
 
 def compute_metrics(response_times):
     """Function to compute average response time and throughput"""
