@@ -10,11 +10,11 @@ from services.buyer_client.session import BuyerSession
 from services.seller_client.session import SellerSession
 
 
-BUYER_SERVER = "buyer_server"
-BUYER_PORT = 6000
+BUYER_SERVER = "34.182.100.10"
+BUYER_PORT = 6001
 
-SELLER_SERVER = "seller_server"
-SELLER_SERVER_PORT = 5000
+SELLER_SERVER = "34.182.100.10"
+SELLER_SERVER_PORT = 5001
 
 def run_seller_operations(seller_id: int):
     response_times = []

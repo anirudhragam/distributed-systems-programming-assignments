@@ -2,7 +2,10 @@
 
 import socket
 from utils.socket_utils import send_message, recv_message
-from session import BuyerSession
+try:
+    from .session import BuyerSession  
+except ImportError:
+    from session import BuyerSession  
 
 class BuyerAPIClient:
     """Client for making API calls to the buyer backend server"""

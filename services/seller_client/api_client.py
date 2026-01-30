@@ -2,7 +2,10 @@
 from typing import Dict, Any, Optional
 import socket
 from utils.socket_utils import send_message, recv_message
-from session import SellerSession
+try:
+    from .session import SellerSession  # For package imports (performance_tests.py)
+except ImportError:
+    from session import SellerSession  # For direct execution (Docker)
 
 class SellerAPIClient:
     """Client for making API calls to the seller backend server"""
