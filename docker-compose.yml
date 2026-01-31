@@ -11,6 +11,7 @@ services:
       POSTGRES_DB: product_db
       POSTGRES_USER: product_user
       POSTGRES_PASSWORD: product_password
+    command: postgres -c max_connections=150
     volumes:
       - product_db_data:/var/lib/postgresql
     networks:
@@ -32,6 +33,7 @@ services:
       POSTGRES_DB: customer_db
       POSTGRES_USER: customer_user
       POSTGRES_PASSWORD: customer_password
+    command: postgres -c max_connections=150
     volumes:
       - customer_db_data:/var/lib/postgresql
     networks:

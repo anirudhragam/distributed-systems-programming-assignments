@@ -88,7 +88,7 @@ def run_seller_operations(seller_id: int):
         response_times.append(elapsed)
     
     except Exception as e:
-            print(f"Seller {seller_id} error: {e}")
+        print(f"Seller {seller_id} error: {e}")
         
     return response_times
 
@@ -197,7 +197,7 @@ def run_buyer_operations(buyer_id: int):
         response_times.append(elapsed)
     
     except Exception as e:
-            print(f"Buyer {buyer_id} error: {e}")
+        print(f"Buyer {buyer_id} error: {e}")
         
     return response_times
 
@@ -213,8 +213,8 @@ def compute_metrics(response_times):
     #     print("Total response time is zero, cannot compute throughput.")
     # if total_operations == 0:
     #     print("Total operations is zero, cannot compute average response time.")
-    average_response_time = total_response_time / total_operations if total_operations > 0 else 0
-    throughput = total_operations / total_response_time_secs if total_response_time_secs > 0 else 0
+    average_response_time = total_response_time / total_operations 
+    throughput = total_operations / total_response_time_secs
 
     return average_response_time, throughput
    

@@ -135,7 +135,9 @@ class SellerServer:
         except Exception as e:
             print(f"Error logging out of seller session: {e}")
             return {"status": "Error", "message": "Failed to log out of seller session."}
-        
+        finally:
+            self.customer_db_pool.putconn(customer_db_conn)
+                    
     def check_if_session_valid(self, session_id: str):
         """Function to check if a given session has not expired""" 
         # Get a connection from the customer DB pool
