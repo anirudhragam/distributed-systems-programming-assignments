@@ -1,29 +1,47 @@
 # distributed-systems-programming-assignments
 Repository containing all the programming assignments for CSCI-5673: Distributed Systems Spring 2026.
 
+### Reproduction Commands
 Terminal 1:
+```
 sh build_containers.sh
 docker-compose ps
+```
 
 Terminal 2:
+```
 docker exec -it seller_client_container python seller_cli.py
+```
 
 Terminal 3:
+```
 docker exec -it customer_db_container psql -U customer_user -d customer_db
+```
 
 Terminal 4:
+```
 docker exec -it product_db_container psql -U product_user -d product_db
+```
 
 Terminal 5:
+```
 docker exec -it buyer_client_container python buyer_cli.py
+```
 
+## GCE creation commands:
 
-GCE creation commands:
+Setup project and authenticate to gcloud with
+
+`gcloud auth login`
+
+Create a new VM instance
+
+```
 gcloud compute instances create pa1-vm \
-  --zone=us-west1-a \
-  --machine-type=e2-standard-2 \
+  --zone=us-west1-b \
+  --machine-type=e2-medium \
   --boot-disk-size=20GB \
-  --image-family=ubuntu-2004-lts \
+  --image-family=ubuntu-2204-lts \
   --tags=pa1 \
   --image-project=ubuntu-os-cloud \
   --metadata=startup-script='#!/bin/bash
@@ -34,31 +52,118 @@ gcloud compute instances create pa1-vm \
     systemctl start docker
     usermod -aG docker $USER
     apt-get install -y curl wget vim'
+```
 
+Setup firewall rules to allow traffic to server ports on the VM
+
+```
 gcloud compute firewall-rules create allow-seller-server \
   --allow=tcp:5001 \
   --target-tags=pa1 \
   --description="Allow traffic on seller server port 5001" \
   --direction=INGRESS
+```
 
+```
 gcloud compute firewall-rules create allow-buyer-server \
   --allow=tcp:6001 \
   --target-tags=pa1 \
   --description="Allow traffic on buyer server port 6001" \
   --direction=INGRESS
+```
 
 SSH to GCE:
-gcloud compute ssh pa1-vm --zone=us-west1-a
+```
+gcloud compute ssh pa1-vm --zone=us-west1-b
+```
 
-Clone repository:
+Inside the SSH session, clone repository:
+```
 git clone https://github.com/anirudhragam/distributed-systems-programming-assignments.git
+```
+
+Setup docker user
+```
+sudo usermod -aG docker $USER
+```
 
 Bring up services:
+```
 cd services
+sudo chmod +x build_containers.sh
+git pull
 bash build_containers.sh
+```
 
 Run performance tests:
+```
+python performance_tests.py --num-sellers 1 --num-buyers 1 > results_1x1.txt 2>&1 | tee results_1x1.txt
+
 python performance_tests.py --num-sellers 10 --num-buyers 10 > results_10x10.txt 2>&1 | tee results_10x10.txt
+
+python performance_tests.py --num-sellers 100 --num-buyers 100 > results_100x100.txt 2>&1 | tee results_100x100.txt
+```
+
+In the README file, provide a brief
+description of your system design along with any assumptions (8-10 lines) and the
+current state of your system (what works and what not).
+
+# System Design
+
+The overall system is structured logically as follows:
+
+Container 1: Seller CLI + API Client (Seller Frontend)
+
+Container 2: Seller Server (Seller Backend)
+
+Container 3: Buyer CLI + API Client (Buyer Frontend)
+
+Container 4: Buyer Server (Buyer Backend)
+
+Container 5: customer-db
+
+Container 6: product-db
+
+Each process runs as a Docker container. The `docker-compose.yml` file has the setup to manage all containers.
+
+The database nodes are Postgres databases
+
+### Search items semantics
+
+### Session Management
+
+When a user (buyer or seller) logs into their account, the server generates a new session id. It returns this session ID in its response back to the frontend.
+
+The frontend stores this session ID along with the user ID.
+
+### Cart Management
+
+
+## Assumptions:
+
+1. API client requests a TCP connection to the server when the client is initialised.
+It then ensures that there is an active connection by sending requests to the server via
+`send_message_with_reconnect`. This method first checks if there is an active connection still. If not, it makes one retry attempts to send a new TCP connection request to the server. So, we make an assumption here that the single retry will create a new successful connection to the server 
+
+    Optimization: Adding multiple retries with exponential backoff
+
+2. Implementation detail: Clear Cart clears the active cart as well as the saved cart
+
+3. Save Cart: save cart is implemented to overwrite the current save cart with the current active cart. Ordering of save cart across sessions is not considered.
+
+    Optimization: Implement some locking mechanism
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
