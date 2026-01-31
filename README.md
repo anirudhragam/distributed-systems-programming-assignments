@@ -42,7 +42,7 @@ Buyer and Seller sessions are being maintained on the backend by the server, by 
 
 When a user (buyer or seller) logs into their account, the server generates a new `session_id` and stores it in the respective sessions table along with the current timestamp (`NOW()`). The `session_id` is then returned to the frontend to display the "logged in" menu.
                   
-Everytime the user performs an operation (like `GetItems`), the server first checks the sessions table to see if the session is still valid, by checking that the time-interval between the `last_active_at` timestamp and the current timestamp is less than 5 minutes. If the session is valid, the server updates the `last_active_at` timestamp and continues with the operation. Else it deletes the row from the sessions table and sends a "session timeout" message to the frontend. The frontend then flushes the session and displays the logout menu.
+Everytime the user performs an operation (like `GetItems`), the server first checks the sessions table to see if the session is still valid, by checking that the time-interval between the `last_active_at` timestamp and the current timestamp is less than 5 minutes. If the session is valid, the server updates the `last_active_at` timestamp and continues with the operation. Else it deletes the row from the sessions table and sends a "session timeout" message to the frontend. The frontend then flushes the session and displays the "logged out" menu.
 
 ### Cart Management
 
