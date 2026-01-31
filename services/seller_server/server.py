@@ -24,8 +24,8 @@ class SellerServer:
 
         # TODO: use constants or env variables for DB connection params
         self.product_db_pool = pool.ThreadedConnectionPool(
-            minconn = 1,
-            maxconn = 25,
+            minconn = 10,
+            maxconn = 100,
             user = "product_user",
             password = "product_password",
             host = "product-db",
@@ -33,8 +33,8 @@ class SellerServer:
             database = "product_db"
         )
         self.customer_db_pool = pool.ThreadedConnectionPool(
-            minconn = 1,
-            maxconn = 25,
+            minconn = 10,
+            maxconn = 100,
             user = "customer_user",
             password = "customer_password",
             host = "customer-db",
