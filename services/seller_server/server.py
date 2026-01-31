@@ -166,10 +166,8 @@ class SellerServer:
 
         try:
             cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
-            # Check if session ID exists
-            # print("SELECT seller_id FROM seller_sessions WHERE session_id = %s AND last_active_at > NOW() - INTERVAL '5 minutes'", (session_id,))
             cursor.execute(
-                "SELECT seller_id FROM seller_sessions WHERE session_id = %s AND last_active_at > NOW() - INTERVAL '2 minutes'",
+                "SELECT seller_id FROM seller_sessions WHERE session_id = %s AND last_active_at > NOW() - INTERVAL '5 minutes'",
                 (session_id,),
             )
 
