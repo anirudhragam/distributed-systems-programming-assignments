@@ -1,6 +1,58 @@
 # distributed-systems-programming-assignments
 Repository containing all the programming assignments for CSCI-5673: Distributed Systems Spring 2026.
 
+# System Design
+
+The overall system is structured logically as follows:
+
+Container 1: Seller CLI + API Client (Seller Frontend)
+
+Container 2: Seller Server (Seller Backend)
+
+Container 3: Buyer CLI + API Client (Buyer Frontend)
+
+Container 4: Buyer Server (Buyer Backend)
+
+Container 5: customer-db
+
+Container 6: product-db
+
+Each process runs as a Docker container. The `docker-compose.yml` file has the setup to manage all containers.
+
+The database nodes run PostgreSQL databases.
+
+All communication between the frontend and backend are happening through TCP sockets. All the messages are length-prefixed, which means that the first 4 bytes of each message contains the length of the message in bytes. The receiver of the message reads the first 4 bytes, determines the message length, say x, and then proceeds to read the next x bytes.
+
+### Search items semantics
+
+### Session Management
+Buyer and Seller sessions are being maintained on the backend by the server, by maintaining two tables in the customer database - `buyer_sessions` and `seller_sessions`. The schemas for the two tables are as follows:
+
+![Buyer Sessions Schema](images/buyer_sessions.png "Buyer Sessions Schema")
+
+![Seller Sessions Schema](images/seller_sessions.png "Seller Sessions Schema")
+
+When a user (buyer or seller) logs into their account, the server generates a new `session_id` and stores it in the respective sessions table along with the current timestamp (`NOW()`). The `session_id` is then returned to the frontend to display the "logged in" menu.
+                  
+Everytime the user performs an operation (like `GetItems`), the server first checks the sessions table to see if the session is still valid, by checking that the time-interval between the `last_active_at` timestamp and the current timestamp is less than 5 minutes. If the session is valid, the server updates the `last_active_at` timestamp and continues with the operation. Else it deletes the row from the sessions table and sends a "session timeout" message to the frontend. The frontend then flushes the session and displays the logout menu.
+
+### Cart Management
+
+
+## Assumptions:
+
+1. API client requests a TCP connection to the server when the client is initialised.
+It then ensures that there is an active connection by sending requests to the server via
+`send_message_with_reconnect`. This method first checks if there is an active connection still. If not, it makes one retry attempts to send a new TCP connection request to the server. So, we make an assumption here that the single retry will create a new successful connection to the server 
+
+    Optimization: Adding multiple retries with exponential backoff
+
+2. Implementation detail: Clear Cart clears the active cart as well as the saved cart
+
+3. Save Cart: save cart is implemented to overwrite the current save cart with the current active cart. Ordering of save cart across sessions is not considered.
+
+    Optimization: Implement some locking mechanism
+
 ### Reproduction Commands
 Terminal 1:
 ```
@@ -108,50 +160,7 @@ In the README file, provide a brief
 description of your system design along with any assumptions (8-10 lines) and the
 current state of your system (what works and what not).
 
-# System Design
 
-The overall system is structured logically as follows:
-
-Container 1: Seller CLI + API Client (Seller Frontend)
-
-Container 2: Seller Server (Seller Backend)
-
-Container 3: Buyer CLI + API Client (Buyer Frontend)
-
-Container 4: Buyer Server (Buyer Backend)
-
-Container 5: customer-db
-
-Container 6: product-db
-
-Each process runs as a Docker container. The `docker-compose.yml` file has the setup to manage all containers.
-
-The database nodes are Postgres databases
-
-### Search items semantics
-
-### Session Management
-
-When a user (buyer or seller) logs into their account, the server generates a new session id. It returns this session ID in its response back to the frontend.
-
-The frontend stores this session ID along with the user ID.
-
-### Cart Management
-
-
-## Assumptions:
-
-1. API client requests a TCP connection to the server when the client is initialised.
-It then ensures that there is an active connection by sending requests to the server via
-`send_message_with_reconnect`. This method first checks if there is an active connection still. If not, it makes one retry attempts to send a new TCP connection request to the server. So, we make an assumption here that the single retry will create a new successful connection to the server 
-
-    Optimization: Adding multiple retries with exponential backoff
-
-2. Implementation detail: Clear Cart clears the active cart as well as the saved cart
-
-3. Save Cart: save cart is implemented to overwrite the current save cart with the current active cart. Ordering of save cart across sessions is not considered.
-
-    Optimization: Implement some locking mechanism
 
 
 
