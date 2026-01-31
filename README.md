@@ -23,8 +23,16 @@ The database nodes run PostgreSQL databases.
 
 All communication between the frontend and backend are happening through TCP sockets. All the messages are length-prefixed, which means that the first 4 bytes of each message contains the length of the message in bytes. The receiver of the message reads the first 4 bytes, determines the message length, say x, and then proceeds to read the next x bytes.
 
-### Search items semantics
+### Search Items Semantics
 
+The `SearchItems` operation on the buyer interface filters items using a two-stage approach, where the `category` column takes precedence over the `keywords` column:
+
+1. **Category filtering**: Items are first filtered by the category parameter
+2. **Keyword filtering**: From the category-filtered results, items containing any of the provided keywords are returned
+
+**Example**:
+- Input: Category = 0, Keywords = ["Black", "Keyboard"]
+- Output: All items in category 0 that contain either "Black" OR "Keyboard" (or both) in the keywords column
 ### Session Management
 Buyer and Seller sessions are being maintained on the backend by the server, by maintaining two tables in the customer database - `buyer_sessions` and `seller_sessions`. The schemas for the two tables are as follows:
 
@@ -155,10 +163,6 @@ python performance_tests.py --num-sellers 10 --num-buyers 10 > results_10x10.txt
 
 python performance_tests.py --num-sellers 100 --num-buyers 100 > results_100x100.txt 2>&1 | tee results_100x100.txt
 ```
-
-In the README file, provide a brief
-description of your system design along with any assumptions (8-10 lines) and the
-current state of your system (what works and what not).
 
 
 
