@@ -46,6 +46,20 @@ Everytime the user performs an operation (like `GetItems`), the server first che
 
 ### Cart Management
 
+The cart management is done on the buyer side.
+There are two tables for cart management - `active cart` and `saved cart`.
+
+The cart tables' schema has cart id, buyer id or session id, and json object `{item_id:quantity}` for added items and their quantity.
+
+The active cart is associated with a specific session and the saved cart is associated with a specific buyer.
+
+When a buyer creates a new account, the buyer server creates a new entry for the buyer in the buyer table with a saved card ID and a saved cart entry in the saved cart table. 
+
+When a new session starts, the buyer server creates a new session with a session ID and a new active cart ID and an active cart entry in the active cart table. When a session terminates, wither by logout or by timeout, the session and active cart is deleted from the database.
+
+When a buyer logs in, if the buyer has items in their saved cart then the server populates the active cart with the items from the saved cart. Otherwise, the server creates an empty active cart.
+
+Add to cart, remove from cart, and display cart operations are performed on the active cart. Save cart operation overwrites the items in the active cart into the buyer's saved cart. Clear cart clears both the active cart and the saved cart.
 
 ## Assumptions:
 
