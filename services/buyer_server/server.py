@@ -21,8 +21,8 @@ class BuyerServer:
 
         # TODO: use constants or env variables for DB connection params
         self.product_db_pool = pool.ThreadedConnectionPool(
-            minconn=100,
-            maxconn=120,
+            minconn=50,
+            maxconn=100,
             user="product_user",
             password="product_password",
             host="product-db",
@@ -30,8 +30,8 @@ class BuyerServer:
             database="product_db",
         )
         self.customer_db_pool = pool.ThreadedConnectionPool(
-            minconn=100,
-            maxconn=120,
+            minconn=50,
+            maxconn=100,
             user="customer_user",
             password="customer_password",
             host="customer-db",
@@ -48,7 +48,7 @@ class BuyerServer:
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.bind((self.server_host, self.server_port))
-            self.socket.listen(120)  # Change number of backlog connections, if needed
+            self.socket.listen(250)  # Change number of backlog connections, if needed
             print(f"Buyer server listening on {self.server_host}:{self.server_port}")
             return self.socket
         except Exception as e:
