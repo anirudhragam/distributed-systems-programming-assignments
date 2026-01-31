@@ -63,12 +63,12 @@ def run_seller_operations(seller_id: int):
             }
 
             start = time.time()
-            response = client.register_item_for_sale(session, item_data)
+            item_response = client.register_item_for_sale(session, item_data)
             elapsed = (time.time() - start) * 1000
             response_times.append(elapsed)
             
-            if response.get('status') == 'OK':
-                item_id = response.get('item_id')
+            if item_response.get('status') == 'OK':
+                item_id = item_response.get('item_id')
                 # Change price
                 start = time.time()
                 response = client.change_item_price(session, item_id, 15.0 + i)
@@ -128,7 +128,7 @@ def run_buyer_operations(buyer_id: int):
 
         # Search items, get item, add to cart, remove from cart, save cart, display cart, clear cart, provide feedback, get seller rating
         # Repeat these operations until approximately 1000 operations are done
-        for i in range((1000 - 2) // 9): 
+        for i in range((1000 - 2) // 6): 
             # Search items
             start = time.time()
             response = client.search_items(session, category=i % 5, keywords=["keyword1"])
@@ -137,12 +137,14 @@ def run_buyer_operations(buyer_id: int):
 
             # Get item
             start = time.time()
-            response = client.get_item(session, item_id=(i % 5)+1)
+            item_response = client.get_item(session, item_id=(i % 5)+1)
             elapsed = (time.time() - start) * 1000
             response_times.append(elapsed)
+            # print(f'Buyer id: {buyer_id}, response after get item: {response}')
 
-            if response.get("status") == "OK" and response.get("item"):
-                item_id = response.get("item").get("item_id")
+            if item_response.get("status") == "OK" and item_response.get("item"):
+                # print(f'Buyer id: {buyer_id}, response: {item_response}')
+                item_id = item_response.get("item").get("item_id")
                 # Provide feedback
                 start = time.time()
                 # random feedback between thumbs up (1) and thumbs down (0)
@@ -151,18 +153,19 @@ def run_buyer_operations(buyer_id: int):
                 response_times.append(elapsed)
 
                 # Add item to cart
-                start = time.time()
-                response = client.add_item_to_cart(session, item_id=item_id, quantity=1)
-                elapsed = (time.time() - start) * 1000
-                response_times.append(elapsed)
+                # start = time.time()
+                # response = client.add_item_to_cart(session, item_id=item_id, quantity=1)
+                # elapsed = (time.time() - start) * 1000
+                # response_times.append(elapsed)
 
                 # Remove item from cart
-                start = time.time()
-                response = client.remove_item_from_cart(session, item_id=item_id, quantity=1)
-                elapsed = (time.time() - start) * 1000
-                response_times.append(elapsed)
+                # start = time.time()
+                # response = client.remove_item_from_cart(session, item_id=item_id, quantity=1)
+                # elapsed = (time.time() - start) * 1000
+                # response_times.append(elapsed)
 
-                seller_id = response.get("item").get("seller_id")
+                # print(f'Buyer id: {buyer_id}, response after remove: {response}')
+                seller_id = item_response.get("item").get("seller_id")
                 # Get seller rating
                 start = time.time()
                 response = client.get_seller_rating(session, seller_id=seller_id)
@@ -170,10 +173,10 @@ def run_buyer_operations(buyer_id: int):
                 response_times.append(elapsed)
 
             # Save cart
-            start = time.time()
-            response = client.save_cart(session)
-            elapsed = (time.time() - start) * 1000
-            response_times.append(elapsed)
+            # start = time.time()
+            # response = client.save_cart(session)
+            # elapsed = (time.time() - start) * 1000
+            # response_times.append(elapsed)
 
             # Display cart
             start = time.time()
@@ -182,10 +185,10 @@ def run_buyer_operations(buyer_id: int):
             response_times.append(elapsed)
 
             # Clear cart
-            start = time.time()
-            response = client.clear_cart(session)
-            elapsed = (time.time() - start) * 1000
-            response_times.append(elapsed)
+            # start = time.time()
+            # response = client.clear_cart(session)
+            # elapsed = (time.time() - start) * 1000
+            # response_times.append(elapsed)
 
         # Logout
         start = time.time()
@@ -205,8 +208,13 @@ def compute_metrics(response_times):
     total_response_time_secs = total_response_time / 1000
     total_operations = len(response_times) # Around 1000 * num_clients
     
-    average_response_time = total_response_time / total_operations
-    throughput = total_operations / total_response_time_secs
+    # print(f"Total operations: {total_operations}, Total response time (s): {total_response_time_secs:.2f}")
+    # if total_response_time_secs == 0:
+    #     print("Total response time is zero, cannot compute throughput.")
+    # if total_operations == 0:
+    #     print("Total operations is zero, cannot compute average response time.")
+    average_response_time = total_response_time / total_operations if total_operations > 0 else 0
+    throughput = total_operations / total_response_time_secs if total_response_time_secs > 0 else 0
 
     return average_response_time, throughput
    
@@ -217,8 +225,8 @@ def run_scenario(num_sellers: int, num_buyers: int):
 
     with ThreadPoolExecutor(max_workers=num_sellers + num_buyers) as executor:
         # Submit all seller tasks
-        seller_futures = { executor.submit(run_seller_operations, i): ("seller", i) for i in range(num_sellers)}
-        buyer_futures = { executor.submit(run_buyer_operations, i): ("buyer", i) for i in range(num_buyers) }
+        seller_futures = { executor.submit(run_seller_operations, i): ("seller", i) for i in range(1, num_sellers+1)}
+        buyer_futures = { executor.submit(run_buyer_operations, i): ("buyer", i) for i in range(1, num_buyers+1) }
 
         # Concatenate all futures
         all_futures = seller_futures | buyer_futures
@@ -230,8 +238,12 @@ def run_scenario(num_sellers: int, num_buyers: int):
                 response_times = future.result()
                 if client_type == "seller":
                     seller_response_times.extend(response_times)
+                    # if len(response_times) == 0:
+                    #     print(f"Seller {client_id} completed with 0 operations.")
                 else:
                     buyer_response_times.extend(response_times)
+                    # if len(response_times) == 0:
+                    #     print(f"Buyer {client_id} completed with 0 operations.")
             except Exception as e:
                 print(f"{client_type} {client_id} exception: {e}")
 
