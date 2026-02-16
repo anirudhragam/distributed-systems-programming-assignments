@@ -14,6 +14,13 @@ import customer_db_pb2
 import customer_db_pb2_grpc
 
 import auth
+import uuid
+
+import requests
+from zeep import Client
+
+# Define extension to convert DECIMAL to FLOAT
+DEC2FLOAT = extensions.new_type(_psycopg.DECIMAL.values, "DEC2FLOAT", extensions.FLOAT)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -41,6 +48,34 @@ def init_grpc_clients():
 
     print("Buyer server initialized with gRPC clients")
 
+
+SOAP_WSDL = "http://financial-transactions:8000/?wsdl"
+soap_client = Client(SOAP_WSDL)
+
+# Initialize database connection pools
+product_db_pool = pool.ThreadedConnectionPool(
+    minconn=50,
+    maxconn=100,
+    user="product_user",
+    password="product_password",
+    host="product-db",
+    port="5432",
+    database="product_db",
+)
+
+customer_db_pool = pool.ThreadedConnectionPool(
+    minconn=50,
+    maxconn=100,
+    user="customer_user",
+    password="customer_password",
+    host="customer-db",
+    port="5432",
+    database="customer_db",
+)
+
+# Register PostgreSQL extensions
+extras.register_uuid()
+extensions.register_type(DEC2FLOAT)
 
 @app.route('/api/buyers/accounts', methods=['POST'])
 def create_account():
@@ -424,10 +459,105 @@ def display_cart(session_id, buyer_id):
 @auth.require_auth(user_type='buyer')
 def make_purchase(session_id, buyer_id):
     """Make a purchase (stubbed)"""
-    return jsonify({
-        "status": "OK",
-        "message": "Purchase functionality not implemented yet."
-    }), 501
+    data = request.json
+    cardholder_name = data.get("cardholder_name")
+    card_number = data.get("card_number")
+    expiry_month = data.get("expiry_month")
+    expiry_year = data.get("expiry_year")
+    security_code = data.get("security_code")
+
+    customer_db_conn = customer_db_pool.getconn()
+    product_db_conn = product_db_pool.getconn()
+    try:
+        product_cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+        customer_cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+
+        customer_cursor.execute(
+            "SELECT username FROM buyers WHERE buyer_id  = %s",
+            (buyer_id,),
+        )
+        result = customer_cursor.fetchone()
+
+        if not result:
+            return jsonify({
+                "status": "Error",
+                "message": "Cannot find buyer with buyer id."
+            }), 404
+
+        customer_cursor.execute(
+            "SELECT active_cart_items FROM active_carts WHERE session_id = %s",
+            (session_id,)
+        )
+        active_cart_result = customer_cursor.fetchone()
+
+        if not active_cart_result:
+            return jsonify({
+                "status": "Error",
+                "message": "Active cart does not exist."
+            }), 404
+
+        total_amount = 0
+        item_ids = []
+        for row in active_cart_result:
+            item_id, quantity = row["item_id"], row["quantity"]
+            product_cursor.execute(
+                "SELECT sale_price FROM products WHERE item_id = %s AND quantity > %s",
+                (item_id, quantity)
+            )
+            sale_price_result = product_cursor.fetchone()
+
+            if not sale_price_result:
+                return jsonify({
+                    "status": "Error",
+                    "message": "Item does not exist or quantity is too low."
+                }), 404
+
+            sale_price = sale_price_result["sale_price"]
+            total_amount += sale_price * quantity
+            item_ids.append(item_id)
+        
+        result = soap_client.service.process_payment(cardholder_name, card_number, expiry_month, expiry_year, security_code)
+
+        if result == "No":
+            return jsonify({
+                "status": "Error",
+                "message": "Payment declined."
+            }), 401
+        elif result == "Yes":
+            customer_cursor.execute(
+                "INSERT INTO transactions (buyer_id, cardholder_name, card_number, expiry_month, expiry_year, security_code, amount) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING transaction_id",
+                (buyer_id, cardholder_name, card_number, expiry_month, expiry_year, security_code, amount)
+            )
+            transaction_id = cursor.fetchone()["transaction_id"]
+
+            customer_cursor.execute(
+                "INSERT INTO purchases (buyer_id, transaction_id, item_ids) VALUES (%s, %s, %s) RETURNING purchase_id",
+                (buyer_id, transaction_id, item_ids)
+            )
+            purchase_id = cursor.fetchone()["purchase_id"]
+
+            # update products quantities
+            # clear active cart
+
+            return jsonify({
+                "status": "OK",
+                "message": "Payment successful.",
+                "transaction_id": transaction_id,
+                "purchase_id": purchase_id
+            }), 200
+
+        return jsonify({
+            "status": "OK",
+            "message": "Unknown error while processing payment. Failed to make purchase."
+        }), 401
+
+    except Exception as e:
+        return jsonify({
+            "status": "Error",
+            "message": "Failed to make purchase."
+        }), 500
+    finally:
+        customer_db_pool.putconn(customer_db_conn)
 
 
 @app.route('/api/buyers/feedback', methods=['POST'])

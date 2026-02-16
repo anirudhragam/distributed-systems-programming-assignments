@@ -48,6 +48,26 @@ CREATE TABLE saved_carts (
   saved_cart_items JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
+-- Financial Transaction Database Schema
+
+CREATE TABLE transactions (
+    transaction_id SERIAL PRIMARY KEY,
+    buyer_id INTEGER NOT NULL REFERENCES buyers(buyers_id),
+    amount NUMERIC(10, 2) NOT NULL,
+    cardholder_name VARCHAR NOT NULL,
+    card_number VARCHAR(16) NOT NULL,
+    expiry_month INT CHECK (expiry_month BETWEEN 1 AND 12) NOT NULL,
+    expiry_year INT NOT NULL,
+    security_code VARCHAR(3) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE purchases (
+    purchase_id SERIAL PRIMARY KEY,
+    buyer_id INTEGER NOT NULL REFERENCES buyers(buyers_id),
+    transaction_id INTEGER NOT NULL REFERENCES transactions(transaction_id),
+    item_ids INTEGER[] NOT NULL
+);
 
 -- Add foreign key constraints to buyer and seller session tables
 ALTER TABLE seller_sessions ADD CONSTRAINT fk_seller_session 
@@ -73,6 +93,8 @@ CREATE INDEX idx_sellers_last_accessed ON seller_sessions(last_active_at);
 CREATE INDEX idx_buyers_last_accessed ON buyer_sessions(last_active_at);
 CREATE INDEX idx_active_carts_session_id ON active_carts(session_id);
 CREATE INDEX idx_saved_carts_buyer_id ON saved_carts(buyer_id);
+CREATE INDEX idx_transactions_buyer_id ON transactions(buyer_id);
+CREATE INDEX idx_purchases_buyer_id ON purchases(buyer_id);
 
 -- Sample data for sellers
 INSERT INTO sellers (username, passwd, thumbs_up, thumbs_down, items_sold)
