@@ -1,94 +1,100 @@
-# API client for communicating with backend server
+# API client for communicating with backend server using REST
 from typing import Dict, Any, Optional
-import socket
-from utils.socket_utils import send_message, recv_message
+import requests
+
 try:
     from .session import SellerSession  # For package imports (performance_tests.py)
 except ImportError:
     from session import SellerSession  # For direct execution (Docker)
 
+
 class SellerAPIClient:
-    """Client for making API calls to the seller backend server"""
-    
+    """Client for making REST API calls to the seller backend server"""
+
     def __init__(self, server_host: str = "seller_server", server_port: int = 5000):
         self.server_host = server_host
         self.server_port = server_port
-        self.connection = None
-        # TODO: Implement TCP socket connection
-        # implement some mechanism to close idle tcp connections (easy way: timeout)
-        # Creating a TCP socket connection with the Seller server. Setting connection timeout to 15 minutes
-        self.connect()
+        self.base_url = f"http://{server_host}:{server_port}/api"
+        self.session_token = None
 
-    def send_message_with_reconnect(self, message: dict):
-        """Function to send message with reconnect logic"""
-        if self.connection is not None:
-            try:
-                send_message(self.connection, message)
-                response = recv_message(self.connection)
-                return response
-            except (ConnectionError, socket.error):
-                print("Connection lost. Reconnecting...")
-                self.connect()
-                send_message(self.connection, message)
-                response = recv_message(self.connection)
-                return response
-        
+        # Setting request timeout to be 15 minutes
+        self.session = requests.Session()
+        self.session.timeout = 900.0
 
-    def connect(self):
-        """Function to establish TCP connection to the seller server"""
-        try:
-            self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.connection.settimeout(60*15)  
-            self.connection.connect((self.server_host, self.server_port))
-        except Exception as e:
-            print(f"Error connecting to seller server: {e}")
-            self.connection = None
+    def get_headers(self):
+        """Get headers including authorization if session token exists"""
+        headers = {"Content-Type": "application/json"}
+        if self.session_token:
+            headers["Authorization"] = f"Bearer {self.session_token}"
+        return headers
 
-    
     def create_account(self, username: str, password: str):
-        """Function to send TCP requests to the seller server, to create a new seller account."""
-        # If server connection is not established or if server terminated the connection, reconnect
-        payload = {
-            "operation": "CreateAccount",
-            "username": username,
-            "password": password
-        }
-        response = self.send_message_with_reconnect(payload)
-        return response
-    
+        """Function to send REST request to the seller server to create a new seller account."""
+        try:
+            response = self.session.post(
+                f"{self.base_url}/sellers/accounts",
+                json={"username": username, "password": password},
+                timeout=self.session.timeout
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error creating account: {e}")
+            return {"status": "Error", "message": f"Connection error: {e}"}
+
     def login(self, username: str, password: str):
-        """Function to send TCP requests to the seller server, to login an existing seller and start a session."""
-        payload = {
-            "operation": "Login",
-            "username": username,
-            "password": password
-        }
-        response = self.send_message_with_reconnect(payload)
-        return response
+        """Function to send REST request to the seller server to login an existing seller and start a session."""
+        try:
+            response = self.session.post(
+                f"{self.base_url}/sellers/sessions",
+                json={"username": username, "password": password},
+                timeout=self.session.timeout
+            )
+            data = response.json()
+
+            # Store session token if login successful
+            if data.get("status") == "OK":
+                self.session_token = data.get("session_id")
+
+            return data
+        except requests.exceptions.RequestException as e:
+            print(f"Error logging in: {e}")
+            return {"status": "Error", "message": f"Connection error: {e}"}
 
     def logout(self, session: SellerSession):
-        """Function to send TCP requests to the seller server, to logout an existing seller."""
-        payload = {
-            "operation": "Logout",
-            "session_id": session.session_id,
-        }
-        response = self.send_message_with_reconnect(payload)
-        return response
-    
+        """Function to send REST request to the seller server to logout an existing seller."""
+        try:
+            response = self.session.delete(
+                f"{self.base_url}/sellers/sessions",
+                headers=self.get_headers(),
+                timeout=self.session.timeout
+            )
+            data = response.json()
+
+            # Clear session token on successful logout
+            if data.get("status") == "OK":
+                self.session_token = None
+
+            return data
+        except requests.exceptions.RequestException as e:
+            print(f"Error logging out: {e}")
+            return {"status": "Error", "message": f"Connection error: {e}"}
+
     def get_seller_rating(self, session: SellerSession):
         """Function to get the seller rating for seller ID associated with current session"""
-        payload = {
-            "operation": "GetSellerRating",
-            "session_id": session.session_id,
-            "seller_id": session.seller_id
-        }
-        response = self.send_message_with_reconnect(payload)
-        return response
-        
-    
+        try:
+            response = self.session.get(
+                f"{self.base_url}/sellers/rating",
+                headers=self.get_headers(),
+                timeout=self.session.timeout
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error getting seller rating: {e}")
+            return {"status": "Error", "message": f"Connection error: {e}"}
+
     def register_item_for_sale(self, session: SellerSession, item_data: dict):
         """
-        Function to accept item details and send TCP request to register item for sale.
+        Function to accept item details and send REST request to register item for sale.
         Args:
             session: Current seller session
             item_data: Dictionary containing:
@@ -98,60 +104,72 @@ class SellerAPIClient:
                 - condition (str): "New" or "Used"
                 - sale_price (float): Price of the item
                 - quantity (int): Number of units available
-                
-        """
-        # Validate item_data?
 
-        payload = {
-            "operation": "RegisterItemForSale",
-            "session_id": session.session_id,
-            "seller_id": session.seller_id,
-            "item_name": item_data["item_name"],
-            "category": item_data["category"],
-            "keywords": item_data["keywords"],  # Check this
-            "condition": item_data["condition"],
-            "sale_price": item_data["sale_price"],
-            "quantity": item_data["quantity"]
-        } 
-        response = self.send_message_with_reconnect(payload)
-        return response
+        """
+        try:
+            payload = {
+                "item_name": item_data["item_name"],
+                "category": item_data["category"],
+                "keywords": item_data["keywords"],
+                "condition": item_data["condition"],
+                "sale_price": item_data["sale_price"],
+                "quantity": item_data["quantity"]
+            }
+
+            response = self.session.post(
+                f"{self.base_url}/sellers/items",
+                json=payload,
+                headers=self.get_headers(),
+                timeout=self.session.timeout
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error registering item for sale: {e}")
+            return {"status": "Error", "message": f"Connection error: {e}"}
 
     def change_item_price(self, session: SellerSession, item_id: int, new_price: float):
         """
-        Function to send TCP request to update price of an item.
+        Function to send REST request to update price of an item.
         """
-        payload = {
-            "operation": "ChangeItemPrice",
-            "session_id": session.session_id,
-            "seller_id": session.seller_id,
-            "item_id": item_id,
-            "new_price": new_price
-        }
-        response = self.send_message_with_reconnect(payload)
-        return response     
-        
+        try:
+            response = self.session.patch(
+                f"{self.base_url}/sellers/items/{item_id}/price",
+                json={"new_price": new_price},
+                headers=self.get_headers(),
+                timeout=self.session.timeout
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error changing item price: {e}")
+            return {"status": "Error", "message": f"Connection error: {e}"}
+
     def update_units_for_sale(self, session: SellerSession, item_id: int, quantity_change: int):
         """
-       Function to send TCP request to update quantity of an item.
+       Function to send REST request to update quantity of an item.
         """
-        payload = {
-            "operation": "UpdateUnitsForSale",
-            "session_id": session.session_id,
-            "seller_id": session.seller_id,
-            "item_id": item_id,
-            "quantity_change": quantity_change
-        }
-        response = self.send_message_with_reconnect(payload)
-        return response     
-    
+        try:
+            response = self.session.patch(
+                f"{self.base_url}/sellers/items/{item_id}/quantity",
+                json={"quantity_change": quantity_change},
+                headers=self.get_headers(),
+                timeout=self.session.timeout
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error updating item quantity: {e}")
+            return {"status": "Error", "message": f"Connection error: {e}"}
+
     def display_items_for_sale(self, session: SellerSession):
         """
-       Function to send TCP request to retrieve all items for sale by the seller.
+       Function to send REST request to retrieve all items for sale by the seller.
         """
-        payload = {
-            "operation": "DisplayItemsForSale",
-            "session_id": session.session_id,
-            "seller_id": session.seller_id
-        }
-        response = self.send_message_with_reconnect(payload)
-        return response
+        try:
+            response = self.session.get(
+                f"{self.base_url}/sellers/items",
+                headers=self.get_headers(),
+                timeout=self.session.timeout
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error displaying items for sale: {e}")
+            return {"status": "Error", "message": f"Connection error: {e}"}
