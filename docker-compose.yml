@@ -2,44 +2,44 @@
 services:
   product-db:
     build:
-      context: ./services/product-db
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/product-db/Dockerfile
     container_name: product_db_container
     ports:
-      - "5432:5432"
+      - "5432:5432"    # PostgreSQL port
+      - "50051:50051"  # gRPC port (ADD THIS)
     environment:
       POSTGRES_DB: product_db
       POSTGRES_USER: product_user
       POSTGRES_PASSWORD: product_password
-    command: postgres -c max_connections=150
     volumes:
-      - product_db_data:/var/lib/postgresql
+      - product_db_data:/var/lib/postgresql/data
     networks:
       - distributed_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db"]
+      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db && nc -z localhost 50051"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   customer-db:
     build:
-      context: ./services/customer-db
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/customer-db/Dockerfile
     container_name: customer_db_container
     ports:
-      - "5433:5432"
+      - "5433:5432"    # PostgreSQL port (mapped to 5433 on host)
+      - "50052:50052"  # gRPC port (ADD THIS)
     environment:
       POSTGRES_DB: customer_db
       POSTGRES_USER: customer_user
       POSTGRES_PASSWORD: customer_password
-    command: postgres -c max_connections=150
     volumes:
-      - customer_db_data:/var/lib/postgresql
+      - customer_db_data:/var/lib/postgresql/data
     networks:
       - distributed_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db"]
+      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -61,8 +61,8 @@ services:
 
   seller_server:
     build:
-      context: ./services/seller_server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/seller_server/Dockerfile
     container_name: seller_server_container
     depends_on:
       product-db:
@@ -96,8 +96,8 @@ services:
 
   buyer_server:
     build:
-      context: ./services/buyer_server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/buyer_server/Dockerfile
     container_name: buyer_server_container
     depends_on:
       product-db:

@@ -1,9 +1,24 @@
 FROM postgres:15
 
-ENV POSTGRES_DB=customer_db
-ENV POSTGRES_USER=customer_user
-ENV POSTGRES_PASSWORD=customer_password
+# Install Python and dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    netcat-traditional \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY init-schema.sql /docker-entrypoint-initdb.d/01-init-schema.sql
+# Install Python packages
+RUN pip3 install --break-system-packages grpcio grpcio-tools psycopg2-binary
 
-EXPOSE 5432
+COPY services/customer-db/init-schema.sql /docker-entrypoint-initdb.d/
+COPY services/customer-db/grpc_server.py /app/
+COPY generated/ /app/generated/
+COPY services/customer-db/startup.sh /app/
+
+RUN chmod +x /app/startup.sh
+
+# Expose PostgreSQL and gRPC ports
+EXPOSE 5432 50052
+
+# Use custom startup script
+CMD ["/app/startup.sh"]

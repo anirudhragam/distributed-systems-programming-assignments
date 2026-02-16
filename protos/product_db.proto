@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+package product_db;
+
+// Product message representing a product in the database
+message Product {
+    int32 item_id = 1;
+    int32 seller_id = 2;
+    string item_name = 3;
+    int32 category = 4;
+    repeated string keywords = 5;
+    string condition = 6;
+    double sale_price = 7;
+    int32 quantity = 8;
+    int32 thumbs_up = 9;
+    int32 thumbs_down = 10;
+}
+
+// Register Item
+message RegisterItemRequest {
+  int32 seller_id = 1;
+  string item_name = 2;
+  int32 category = 3;
+  repeated string keywords = 4;
+  string condition = 5;
+  double sale_price = 6;
+  int32 quantity = 7;
+}
+
+message RegisterItemResponse {
+  bool success = 1;
+  int32 item_id = 2;
+  string error_message = 3;
+}
+
+// Update Item Price
+message UpdateItemPriceRequest {
+  int32 item_id = 1;
+  int32 seller_id = 2;
+  double new_price = 3;
+}
+
+message UpdateItemPriceResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Update Item Quantity
+message UpdateItemQuantityRequest {
+  int32 item_id = 1;
+  int32 seller_id = 2;
+  int32 quantity_change = 3;
+}
+
+message UpdateItemQuantityResponse {
+  bool success = 1;
+  int32 new_quantity = 2;
+  string error_message = 3;
+}
+
+// Get Items by Seller
+message GetItemsBySellerRequest {
+  int32 seller_id = 1;
+}
+
+message GetItemsBySellerResponse {
+  bool success = 1;
+  repeated Product items = 2;
+  string error_message = 3;
+}
+
+// Search Items
+message SearchItemsRequest {
+  int32 category = 1;
+  repeated string keywords = 2;
+}
+
+message SearchItemsResponse {
+  bool success = 1;
+  repeated Product items = 2;
+  string error_message = 3;
+}
+
+// Get Single Item
+message GetItemRequest {
+  int32 item_id = 1;
+}
+
+message GetItemResponse {
+  bool success = 1;
+  Product item = 2;
+  string error_message = 3;
+}
+
+// Update Item Feedback
+message UpdateItemFeedbackRequest {
+  int32 item_id = 1;
+  bool thumbs_up = 2;  // true for thumbs up, false for thumbs down
+}
+
+message UpdateItemFeedbackResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Get Item Quantity
+message GetItemQuantityRequest {
+  int32 item_id = 1;
+}
+
+message GetItemQuantityResponse {
+  bool success = 1;
+  int32 quantity = 2;
+  string error_message = 3;
+}
+
+// Get Item Seller
+message GetItemSellerRequest {
+  int32 item_id = 1;
+}
+
+message GetItemSellerResponse {
+  bool success = 1;
+  int32 seller_id = 2;
+  string error_message = 3;
+}
+
+// Product DB Service Definition
+service ProductDBService {
+  rpc RegisterItem(RegisterItemRequest) returns (RegisterItemResponse);
+  rpc UpdateItemPrice(UpdateItemPriceRequest) returns (UpdateItemPriceResponse);
+  rpc UpdateItemQuantity(UpdateItemQuantityRequest) returns (UpdateItemQuantityResponse);
+  rpc GetItemsBySeller(GetItemsBySellerRequest) returns (GetItemsBySellerResponse);
+  rpc SearchItems(SearchItemsRequest) returns (SearchItemsResponse);
+  rpc GetItem(GetItemRequest) returns (GetItemResponse);
+  rpc UpdateItemFeedback(UpdateItemFeedbackRequest) returns (UpdateItemFeedbackResponse);
+  rpc GetItemQuantity(GetItemQuantityRequest) returns (GetItemQuantityResponse);
+  rpc GetItemSeller(GetItemSellerRequest) returns (GetItemSellerResponse);
+}
+

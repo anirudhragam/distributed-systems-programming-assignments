@@ -1,0 +1,212 @@
+syntax="proto3";
+
+package customer_db;
+
+// ========== Common Messages ==========
+
+message Rating {
+  int32 thumbs_up = 1;
+  int32 thumbs_down = 2;
+}
+
+message CartItems {
+  map<string, int32> items = 1;  // item_id (as string) -> quantity
+}
+
+// ========== Seller Operations ==========
+message CreateSellerRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message CreateSellerResponse {
+  bool success = 1;
+  int32 seller_id = 2;
+  string error_message = 3;
+}
+
+message SellerLoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message SellerLoginResponse {
+  bool success = 1;
+  string session_id = 2;
+  int32 seller_id = 3;
+  string username = 4;
+  string error_message = 5;
+}
+
+message GetSellerRatingRequest {
+  int32 seller_id = 1;
+}
+
+message GetSellerRatingResponse {
+  bool success = 1;
+  Rating rating = 2;
+  string error_message = 3;
+}
+
+message UpdateSellerFeedbackRequest {
+  int32 seller_id = 1;
+  bool thumbs_up = 2;  
+}
+
+message UpdateSellerFeedbackResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// ========== Buyer Operations ==========
+message CreateBuyerRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message CreateBuyerResponse {
+  bool success = 1;
+  int32 buyer_id = 2;
+  string saved_cart_id = 3;
+  string error_message = 4;
+}
+
+message BuyerLoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message BuyerLoginResponse {
+  bool success = 1;
+  string session_id = 2;
+  int32 buyer_id = 3;
+  string username = 4;
+  CartItems saved_cart_items = 5;
+  string error_message = 6;
+}
+
+// ========== Session Operations ==========
+message ValidateSellerSessionRequest {
+  string session_id = 1;
+}
+
+message ValidateSellerSessionResponse {
+  bool valid = 1;
+  int32 seller_id = 2;
+  string error_message = 3;
+}
+
+message ValidateBuyerSessionRequest {
+  string session_id = 1;
+}
+
+message ValidateBuyerSessionResponse {
+  bool valid = 1;
+  int32 buyer_id = 2;
+  string error_message = 3;
+}
+
+message UpdateSellerSessionTimestampRequest {
+  string session_id = 1;
+}
+
+message UpdateSellerSessionTimestampResponse {
+  bool success = 1;
+}
+
+message UpdateBuyerSessionTimestampRequest {
+  string session_id = 1;
+}
+
+message UpdateBuyerSessionTimestampResponse {
+  bool success = 1;
+}
+
+message LogoutRequest {
+  string session_id = 1;
+}
+
+message LogoutResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// ========== Cart Operations ==========
+message AddItemToCartRequest {
+  string session_id = 1;
+  int32 item_id = 2;
+  int32 quantity = 3;
+}
+
+message AddItemToCartResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message RemoveItemFromCartRequest {
+  string session_id = 1;
+  int32 item_id = 2;
+  int32 quantity = 3;
+}
+
+message RemoveItemFromCartResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message GetCartRequest {
+  string session_id = 1;
+}
+
+message GetCartResponse {
+  bool success = 1;
+  CartItems cart_items = 2;
+  string error_message = 3;
+}
+
+message SaveCartRequest {
+  string session_id = 1;
+  int32 buyer_id = 2;
+}
+
+message SaveCartResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message ClearCartRequest {
+  string session_id = 1;
+  int32 buyer_id = 2;
+}
+
+message ClearCartResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// ========== Service Definition ==========
+
+service CustomerDBService {
+  // Seller operations
+  rpc CreateSeller(CreateSellerRequest) returns (CreateSellerResponse);
+  rpc SellerLogin(SellerLoginRequest) returns (SellerLoginResponse);
+  rpc SellerLogout(LogoutRequest) returns (LogoutResponse);
+  rpc GetSellerRating(GetSellerRatingRequest) returns (GetSellerRatingResponse);
+  rpc ValidateSellerSession(ValidateSellerSessionRequest) returns (ValidateSellerSessionResponse);
+  rpc UpdateSellerSessionTimestamp(UpdateSellerSessionTimestampRequest) returns (UpdateSellerSessionTimestampResponse);
+  rpc UpdateSellerFeedback(UpdateSellerFeedbackRequest) returns (UpdateSellerFeedbackResponse);
+  
+  // Buyer operations
+  rpc CreateBuyer(CreateBuyerRequest) returns (CreateBuyerResponse);
+  rpc BuyerLogin(BuyerLoginRequest) returns (BuyerLoginResponse);
+  rpc BuyerLogout(LogoutRequest) returns (LogoutResponse);
+  rpc ValidateBuyerSession(ValidateBuyerSessionRequest) returns (ValidateBuyerSessionResponse);
+  rpc UpdateBuyerSessionTimestamp(UpdateBuyerSessionTimestampRequest) returns (UpdateBuyerSessionTimestampResponse);
+  
+  // Cart operations
+  rpc AddItemToCart(AddItemToCartRequest) returns (AddItemToCartResponse);
+  rpc RemoveItemFromCart(RemoveItemFromCartRequest) returns (RemoveItemFromCartResponse);
+  rpc GetCart(GetCartRequest) returns (GetCartResponse);
+  rpc SaveCart(SaveCartRequest) returns (SaveCartResponse);
+  rpc ClearCart(ClearCartRequest) returns (ClearCartResponse);
+}

@@ -1,45 +1,45 @@
 """
-Flask-based RESTful API server for seller operations
+Flask-based RESTful API server for seller operations (gRPC-based)
 """
 import os
-import uuid
+import grpc
+import sys
 from flask import Flask, request, jsonify
-from psycopg2 import _psycopg, extensions, extras, pool
 
-from auth import require_auth
+# Add generated protobuf path
+sys.path.insert(0, '/app/generated')
+import product_db_pb2
+import product_db_pb2_grpc
+import customer_db_pb2
+import customer_db_pb2_grpc
 
-# Define extension to convert DECIMAL to FLOAT
-DEC2FLOAT = extensions.new_type(_psycopg.DECIMAL.values, "DEC2FLOAT", extensions.FLOAT)
+import auth
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Initialize database connection pools
-product_db_pool = pool.ThreadedConnectionPool(
-    minconn=50,
-    maxconn=100,
-    user="product_user",
-    password="product_password",
-    host="product-db",
-    port="5432",
-    database="product_db",
-)
+# Global gRPC clients
+product_db_channel = None
+product_db_stub = None
+customer_db_channel = None
+customer_db_stub = None
 
-customer_db_pool = pool.ThreadedConnectionPool(
-    minconn=50,
-    maxconn=100,
-    user="customer_user",
-    password="customer_password",
-    host="customer-db",
-    port="5432",
-    database="customer_db",
-)
 
-# Register PostgreSQL extensions
-extras.register_uuid()
-extensions.register_type(DEC2FLOAT)
+def init_grpc_clients():
+    """Initialize gRPC client stubs for database services"""
+    global product_db_channel, product_db_stub, customer_db_channel, customer_db_stub
 
-print("Seller server initialized with Flask")
+    # Create persistent gRPC channels
+    product_db_channel = grpc.insecure_channel('product-db:50051')
+    product_db_stub = product_db_pb2_grpc.ProductDBServiceStub(product_db_channel)
+
+    customer_db_channel = grpc.insecure_channel('customer-db:50052')
+    customer_db_stub = customer_db_pb2_grpc.CustomerDBServiceStub(customer_db_channel)
+
+    # Inject customer_db_stub into auth module
+    auth.set_customer_db_stub(customer_db_stub)
+
+    print("Seller server initialized with gRPC clients")
 
 
 @app.route('/api/sellers/accounts', methods=['POST'])
@@ -49,42 +49,35 @@ def create_account():
     username = data.get("username")
     password = data.get("password")
 
-    customer_db_conn = customer_db_pool.getconn()
     try:
-        cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
-
-        # Check if username already exists
-        cursor.execute(
-            "SELECT seller_id FROM sellers WHERE username = %s", (username,)
+        request_msg = customer_db_pb2.CreateSellerRequest(
+            username=username,
+            password=password
         )
-        result = cursor.fetchone()
-        if result:
+        response = customer_db_stub.CreateSeller(request_msg)
+
+        if not response.success:
+            if "already exists" in response.error_message.lower():
+                return jsonify({
+                    "status": "Error",
+                    "message": "Username already exists."
+                }), 409
             return jsonify({
                 "status": "Error",
-                "message": "Username already exists."
-            }), 409
-
-        # Insert new seller into the database
-        cursor.execute(
-            "INSERT INTO sellers (username, passwd) VALUES (%s, %s) RETURNING seller_id",
-            (username, password),
-        )
-        seller_id = cursor.fetchone()["seller_id"]
-        customer_db_conn.commit()
+                "message": response.error_message
+            }), 500
 
         return jsonify({
             "status": "OK",
-            "seller_id": seller_id
+            "seller_id": response.seller_id
         }), 201
 
-    except Exception as e:
-        print(f"Error creating seller account: {e}")
+    except grpc.RpcError as e:
+        print(f"gRPC error creating seller account: {e.code()} - {e.details()}")
         return jsonify({
             "status": "Error",
             "message": "Failed to create account."
         }), 500
-    finally:
-        customer_db_pool.putconn(customer_db_conn)
 
 
 @app.route('/api/sellers/sessions', methods=['POST'])
@@ -94,94 +87,70 @@ def login():
     username = data.get("username")
     password = data.get("password")
 
-    customer_db_conn = customer_db_pool.getconn()
     try:
-        cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
-
-        # Verify username and password
-        cursor.execute(
-            "SELECT seller_id, username FROM sellers WHERE username = %s AND passwd = %s",
-            (username, password),
+        request_msg = customer_db_pb2.SellerLoginRequest(
+            username=username,
+            password=password
         )
-        result = cursor.fetchone()
-        if not result:
+        response = customer_db_stub.SellerLogin(request_msg)
+
+        if not response.success:
             return jsonify({
                 "status": "Error",
                 "message": "Username/Password combination does not exist."
             }), 401
 
-        seller_id = result["seller_id"]
-        username = result["username"]
-
-        # Create a new session
-        session_id = str(uuid.uuid4())
-        cursor.execute(
-            "INSERT INTO seller_sessions (session_id, seller_id) VALUES (%s, %s)",
-            (session_id, seller_id),
-        )
-        customer_db_conn.commit()
-
         return jsonify({
             "status": "OK",
-            "session_id": session_id,
-            "seller_id": seller_id,
-            "message": f"I've seen enough. Welcome back {username}"
+            "session_id": response.session_id,
+            "seller_id": response.seller_id,
+            "message": f"I've seen enough. Welcome back {response.username}"
         }), 201
 
-    except Exception as e:
-        print(f"Error logging into seller account: {e}")
+    except grpc.RpcError as e:
+        print(f"gRPC error logging into seller account: {e.code()} - {e.details()}")
         return jsonify({
             "status": "Error",
             "message": "Failed to log in to seller account."
         }), 500
-    finally:
-        customer_db_pool.putconn(customer_db_conn)
 
 
 @app.route('/api/sellers/sessions', methods=['DELETE'])
-@require_auth(customer_db_pool)
+@auth.require_auth(user_type='seller')
 def logout(session_id, seller_id):
     """Logout and delete the session"""
-    customer_db_conn = customer_db_pool.getconn()
     try:
-        cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+        request_msg = customer_db_pb2.LogoutRequest(session_id=session_id)
+        response = customer_db_stub.SellerLogout(request_msg)
 
-        # Delete the session from the seller_sessions table
-        cursor.execute(
-            "DELETE FROM seller_sessions WHERE session_id = %s", (session_id,)
-        )
-        customer_db_conn.commit()
+        if not response.success:
+            return jsonify({
+                "status": "Error",
+                "message": "Failed to log out."
+            }), 500
 
         return jsonify({
             "status": "OK",
             "message": "Successfully logged out."
         }), 200
 
-    except Exception as e:
-        print(f"Error logging out of seller session: {e}")
+    except grpc.RpcError as e:
+        print(f"gRPC error logging out of seller session: {e.code()} - {e.details()}")
         return jsonify({
             "status": "Error",
             "message": "Failed to log out of seller session."
         }), 500
-    finally:
-        customer_db_pool.putconn(customer_db_conn)
 
 
 @app.route('/api/sellers/rating', methods=['GET'])
-@require_auth(customer_db_pool)
+@auth.require_auth(user_type='seller')
 def get_seller_rating(session_id, seller_id):
     """Get seller rating (thumbs up/down counts)"""
-    customer_db_conn = customer_db_pool.getconn()
     try:
-        cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+        request_msg = customer_db_pb2.GetSellerRatingRequest(seller_id=seller_id)
+        response = customer_db_stub.GetSellerRating(request_msg)
 
-        # Fetch thumbs up and thumbs down counts
-        cursor.execute(
-            "SELECT thumbs_up, thumbs_down FROM sellers WHERE seller_id = %s",
-            (seller_id,),
-        )
-        result = cursor.fetchone()
-        if not result:
+        if not response.success:
             return jsonify({
                 "status": "Error",
                 "message": "Seller ID does not exist."
@@ -189,22 +158,20 @@ def get_seller_rating(session_id, seller_id):
 
         return jsonify({
             "status": "OK",
-            "thumbs_up": result["thumbs_up"],
-            "thumbs_down": result["thumbs_down"]
+            "thumbs_up": response.rating.thumbs_up,
+            "thumbs_down": response.rating.thumbs_down
         }), 200
 
-    except Exception as e:
-        print(f"Error getting seller rating: {e}")
+    except grpc.RpcError as e:
+        print(f"gRPC error getting seller rating: {e.code()} - {e.details()}")
         return jsonify({
             "status": "Error",
             "message": "Failed to get seller rating."
         }), 500
-    finally:
-        customer_db_pool.putconn(customer_db_conn)
 
 
 @app.route('/api/sellers/items', methods=['POST'])
-@require_auth(customer_db_pool)
+@auth.require_auth(user_type='seller')
 def register_item_for_sale(session_id, seller_id):
     """Register a new item for sale"""
     data = request.json
@@ -215,142 +182,148 @@ def register_item_for_sale(session_id, seller_id):
     sale_price = data.get("sale_price")
     quantity = data.get("quantity")
 
-    product_db_conn = product_db_pool.getconn()
     try:
-        cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
-
-        # Insert new item into the products table
-        cursor.execute(
-            "INSERT INTO products (seller_id, item_name, category, keywords, condition, sale_price, quantity) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING item_id",
-            (seller_id, item_name, category, keywords, condition, sale_price, quantity),
+        request_msg = product_db_pb2.RegisterItemRequest(
+            seller_id=seller_id,
+            item_name=item_name,
+            category=category,
+            keywords=keywords,  # list automatically converts to repeated
+            condition=condition,
+            sale_price=sale_price,
+            quantity=quantity
         )
-        item_id = cursor.fetchone()["item_id"]
-        product_db_conn.commit()
+        response = product_db_stub.RegisterItem(request_msg)
+
+        if not response.success:
+            return jsonify({
+                "status": "Error",
+                "message": response.error_message
+            }), 500
 
         return jsonify({
             "status": "OK",
-            "message": f"Item {item_name} registered for sale successfully with Item ID {item_id}"
+            "message": f"Item {item_name} registered for sale successfully with Item ID {response.item_id}"
         }), 201
 
-    except Exception as e:
-        print(f"Error registering item for sale: {e}")
+    except grpc.RpcError as e:
+        print(f"gRPC error registering item for sale: {e.code()} - {e.details()}")
         return jsonify({
             "status": "Error",
             "message": "Failed to register item for sale."
         }), 500
-    finally:
-        product_db_pool.putconn(product_db_conn)
 
 
 @app.route('/api/sellers/items/<int:item_id>/price', methods=['PATCH'])
-@require_auth(customer_db_pool)
+@auth.require_auth(user_type='seller')
 def change_item_price(session_id, seller_id, item_id):
     """Change the price of an item"""
     data = request.json
     new_price = data.get("new_price")
 
-    product_db_conn = product_db_pool.getconn()
     try:
-        cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
-
-        # Update the item price
-        cursor.execute(
-            "UPDATE products SET sale_price = %s WHERE item_id = %s AND seller_id = %s",
-            (new_price, item_id, int(seller_id)),
+        request_msg = product_db_pb2.UpdateItemPriceRequest(
+            item_id=item_id,
+            seller_id=seller_id,
+            new_price=new_price
         )
+        response = product_db_stub.UpdateItemPrice(request_msg)
 
-        if cursor.rowcount == 0:
+        if not response.success:
+            if "does not exist" in response.error_message.lower() or "does not belong" in response.error_message.lower():
+                return jsonify({
+                    "status": "Error",
+                    "message": "Item ID does not exist or does not belong to the seller."
+                }), 404
             return jsonify({
                 "status": "Error",
-                "message": "Item ID does not exist or does not belong to the seller."
-            }), 404
-
-        product_db_conn.commit()
+                "message": response.error_message
+            }), 500
 
         return jsonify({
             "status": "OK",
             "message": f"Item price for item {item_id} updated successfully to {new_price}"
         }), 200
 
-    except Exception as e:
-        print(f"Error changing item price: {e}")
+    except grpc.RpcError as e:
+        print(f"gRPC error changing item price: {e.code()} - {e.details()}")
         return jsonify({
             "status": "Error",
             "message": "Failed to change item price."
         }), 500
-    finally:
-        product_db_pool.putconn(product_db_conn)
 
 
 @app.route('/api/sellers/items/<int:item_id>/quantity', methods=['PATCH'])
-@require_auth(customer_db_pool)
+@auth.require_auth(user_type='seller')
 def update_units_for_sale(session_id, seller_id, item_id):
     """Update the quantity of units available for sale"""
     data = request.json
     quantity_change = data.get("quantity_change")
 
-    product_db_conn = product_db_pool.getconn()
     try:
-        cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
-
-        # Fetch current quantity
-        cursor.execute(
-            "SELECT quantity FROM products WHERE item_id = %s AND seller_id = %s",
-            (item_id, seller_id),
+        request_msg = product_db_pb2.UpdateItemQuantityRequest(
+            item_id=item_id,
+            seller_id=seller_id,
+            quantity_change=quantity_change
         )
-        result = cursor.fetchone()
-        if not result:
+        response = product_db_stub.UpdateItemQuantity(request_msg)
+
+        if not response.success:
+            if "does not exist" in response.error_message.lower() or "does not belong" in response.error_message.lower():
+                return jsonify({
+                    "status": "Error",
+                    "message": "Item ID does not exist or does not belong to the seller."
+                }), 404
+            if "negative" in response.error_message.lower():
+                return jsonify({
+                    "status": "Error",
+                    "message": "Available units cannot be negative."
+                }), 400
             return jsonify({
                 "status": "Error",
-                "message": "Item ID does not exist or does not belong to the seller."
-            }), 404
-
-        current_quantity = result["quantity"]
-        new_quantity = current_quantity - quantity_change
-
-        if new_quantity < 0:
-            return jsonify({
-                "status": "Error",
-                "message": "Available units cannot be negative."
-            }), 400
-
-        # Update the item quantity
-        cursor.execute(
-            "UPDATE products SET quantity = %s WHERE item_id = %s AND seller_id = %s",
-            (new_quantity, item_id, int(seller_id)),
-        )
-        product_db_conn.commit()
+                "message": response.error_message
+            }), 500
 
         return jsonify({
             "status": "OK",
-            "message": f"Item quantity for item {item_id} updated successfully to {new_quantity}"
+            "message": f"Item quantity for item {item_id} updated successfully to {response.new_quantity}"
         }), 200
 
-    except Exception as e:
-        print(f"Error updating item quantity: {e}")
+    except grpc.RpcError as e:
+        print(f"gRPC error updating item quantity: {e.code()} - {e.details()}")
         return jsonify({
             "status": "Error",
             "message": "Failed to update item quantity."
         }), 500
-    finally:
-        product_db_pool.putconn(product_db_conn)
 
 
 @app.route('/api/sellers/items', methods=['GET'])
-@require_auth(customer_db_pool)
+@auth.require_auth(user_type='seller')
 def display_items_for_sale(session_id, seller_id):
     """Display all items for sale by the seller"""
-    product_db_conn = product_db_pool.getconn()
     try:
-        cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+        request_msg = product_db_pb2.GetItemsBySellerRequest(seller_id=seller_id)
+        response = product_db_stub.GetItemsBySeller(request_msg)
 
-        cursor.execute(
-            "SELECT item_id, item_name, category, keywords, condition, sale_price::float, quantity, "
-            "thumbs_up, thumbs_down FROM products WHERE seller_id = %s AND quantity > 0",
-            (seller_id,),
-        )
-        items = cursor.fetchall()
+        if not response.success:
+            return jsonify({
+                "status": "Error",
+                "message": response.error_message
+            }), 500
+
+        # Convert protobuf Product messages to dict
+        items = []
+        for product in response.products:
+            items.append({
+                "item_id": product.item_id,
+                "item_name": product.item_name,
+                "category": product.category,
+                "keywords": list(product.keywords),
+                "condition": product.condition,
+                "sale_price": product.sale_price,
+                "quantity": product.quantity,
+                "thumbs_up": product.thumbs_up,
+                "thumbs_down": product.thumbs_down
+            })
 
         if not items:
             return jsonify({
@@ -363,17 +336,18 @@ def display_items_for_sale(session_id, seller_id):
             "items": items
         }), 200
 
-    except Exception as e:
-        print(f"Error displaying items for sale: {e}")
+    except grpc.RpcError as e:
+        print(f"gRPC error displaying items for sale: {e.code()} - {e.details()}")
         return jsonify({
             "status": "Error",
             "message": "Failed to display items for sale."
         }), 500
-    finally:
-        product_db_pool.putconn(product_db_conn)
 
 
 if __name__ == "__main__":
+    # Initialize gRPC clients before starting server
+    init_grpc_clients()
+
     server_host = os.getenv("SERVER_HOST", "0.0.0.0")
     server_port = int(os.getenv("SERVER_PORT", "5000"))
 
