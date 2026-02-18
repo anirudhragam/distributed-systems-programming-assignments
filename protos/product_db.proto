@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package product_db;
 
-// Product message representing a product in the database
-message Product {
+// Item message representing an item in the database
+message Item {
     int32 item_id = 1;
     int32 seller_id = 2;
     string item_name = 3;
@@ -65,7 +65,7 @@ message GetItemsBySellerRequest {
 
 message GetItemsBySellerResponse {
   bool success = 1;
-  repeated Product items = 2;
+  repeated Item items = 2;
   string error_message = 3;
 }
 
@@ -77,7 +77,7 @@ message SearchItemsRequest {
 
 message SearchItemsResponse {
   bool success = 1;
-  repeated Product items = 2;
+  repeated Item items = 2;
   string error_message = 3;
 }
 
@@ -88,7 +88,7 @@ message GetItemRequest {
 
 message GetItemResponse {
   bool success = 1;
-  Product item = 2;
+  Item item = 2;
   string error_message = 3;
 }
 

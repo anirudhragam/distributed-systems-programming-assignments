@@ -184,6 +184,51 @@ message ClearCartResponse {
   string error_message = 2;
 }
 
+// ========== Transaction/Purchase Operations ==========
+
+message InsertTransactionRequest {
+  int32 buyer_id = 1;
+  string cardholder_name = 2;
+  string card_number = 3;
+  int32 expiry_month = 4;
+  int32 expiry_year = 5;
+  string security_code = 6;
+  double amount = 7;
+}
+
+message InsertTransactionResponse {
+  bool success = 1;
+  int32 transaction_id = 2;
+  string error_message = 3;
+}
+
+message InsertPurchaseRequest {
+  int32 buyer_id = 1;
+  int32 transaction_id = 2;
+  repeated int32 item_ids = 3;
+}
+
+message InsertPurchaseResponse {
+  bool success = 1;
+  int32 purchase_id = 2;
+  string error_message = 3;
+}
+
+message GetBuyerPurchasesRequest {
+  int32 buyer_id = 1;
+}
+
+message PurchaseRecord {
+  int32 purchase_id = 1;
+  repeated int32 item_ids = 2;
+}
+
+message GetBuyerPurchasesResponse {
+  bool success = 1;
+  repeated PurchaseRecord purchases = 2;
+  string error_message = 3;
+}
+
 // ========== Service Definition ==========
 
 service CustomerDBService {
@@ -209,4 +254,9 @@ service CustomerDBService {
   rpc GetCart(GetCartRequest) returns (GetCartResponse);
   rpc SaveCart(SaveCartRequest) returns (SaveCartResponse);
   rpc ClearCart(ClearCartRequest) returns (ClearCartResponse);
+
+  // Transaction/Purchase operations
+  rpc InsertTransaction(InsertTransactionRequest) returns (InsertTransactionResponse);
+  rpc InsertPurchase(InsertPurchaseRequest) returns (InsertPurchaseResponse);
+  rpc GetBuyerPurchases(GetBuyerPurchasesRequest) returns (GetBuyerPurchasesResponse);
 }

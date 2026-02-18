@@ -316,15 +316,35 @@ class BuyerCLI:
 
     def handle_make_purchase(self):
         """To be implemented in future. Handle make purchase"""
-        response = self.api_client.make_purchase(self.session)
+        try:
+            cardholder_name = input("Name on card: ").strip()
+            card_number = input("Card number (enter 16-digits): ").strip()
+            if len(card_number) != 16:
+                print("Error: Invalid card number. Enter a valid 16-digit card number.")
+                return
+            expiry_month = int(input("Expiry month: ").strip())
+            if not 1 <= expiry_month <= 12:
+                print("Error: Invalid expiry month. Expiry month should be a number between 1 and 12.")
+                return
+            expiry_year = int(input("Expiry year: ").strip())
+            if not 1000 <= expiry_year <= 9999:
+                print("Error: Invalid expiry year. Expiry year should be a 4-digit number.")
+                return
+            security_code = input("Security code: ").strip()
+            if len(security_code) != 3:
+                print("Error: Invalid security code. Enter a valid 3-digit security card.")
+                return
+            response = self.api_client.make_purchase(self.session, cardholder_name, card_number, expiry_month, expiry_year, security_code)
 
-        if response.get("status") == "OK":
-            print(f"{response.get('message')}")
-        elif response.get("status") == "Timeout":
-            print(f"Error: {response.get('message', 'Session timed out')}")
-            self.session.clear()
-        else:
-            print(f"Error: {response.get('message', 'Could not complete purchase')}")
+            if response.get("status") == "OK":
+                print(f"{response.get('message')}")
+            elif response.get("status") == "Timeout":
+                print(f"Error: {response.get('message', 'Session timed out')}")
+                self.session.clear()
+            else:
+                print(f"Error: {response.get('message', 'Could not complete purchase')}")
+        except ValueError:
+            print("Error: Invalid input.")
 
     def handle_provide_feedback(self):
         """Handle provide feedback for item"""
@@ -385,7 +405,9 @@ class BuyerCLI:
             self.session.clear()
 
         elif response.get("status") == "OK":
-            print("You have no purchase history.")
+            purchases = response.get("purchases")
+            for i, purchase in enumerate(purchases):
+                print(f"{i+1}. Purchase ID: {purchase['purchase_id']}  Item IDs: {purchase['item_ids']}")
         else:
             print(
                 f"Error: {response.get('message', 'Could not retrieve purchase history')}"

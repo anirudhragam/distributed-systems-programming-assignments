@@ -104,6 +104,8 @@ services:
         condition: service_healthy
       customer-db:
         condition: service_healthy
+      financial-transactions:
+        condition: service_healthy
     ports:
       - "6001:6000"
     environment:
@@ -114,6 +116,21 @@ services:
     networks:
       - distributed_network
 
+  financial-transactions:
+    build:
+      context: ./services/financial_transactions
+      dockerfile: Dockerfile
+    container_name: financial_transactions_container
+    ports:
+      - "8000:8000"
+    networks:
+      - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://0.0.0.0:8000/?wsdl')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   product_db_data:

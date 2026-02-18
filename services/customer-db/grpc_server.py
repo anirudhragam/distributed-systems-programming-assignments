@@ -2,14 +2,15 @@
 gRPC server for Customer Database
 Handles sellers, buyers, sessions, and cart operations
 """
-import grpc
-from concurrent import futures
-import psycopg2
-from psycopg2 import pool, extras
+import json
 import os
 import sys
 import uuid
-import json
+from concurrent import futures
+
+import grpc
+import psycopg2
+from psycopg2 import extras, pool
 
 # Add generated code to path
 sys.path.insert(0, '/app/generated')
@@ -354,18 +355,18 @@ class CustomerDBServicer(customer_db_pb2_grpc.CustomerDBServiceServicer):
             session_id = str(uuid.uuid4())
             active_cart_id = str(uuid.uuid4())
             
+            # Create session first (active_carts FK references buyer_sessions)
+            cursor.execute(
+                "INSERT INTO buyer_sessions (session_id, buyer_id, active_cart_id) "
+                "VALUES (%s, %s, %s)",
+                (session_id, buyer_id, active_cart_id)
+            )
+
             # Create active cart with saved cart items
             cursor.execute(
                 "INSERT INTO active_carts (active_cart_id, session_id, active_cart_items) "
                 "VALUES (%s, %s, %s)",
                 (active_cart_id, session_id, json.dumps(saved_cart_items))
-            )
-            
-            # Create session
-            cursor.execute(
-                "INSERT INTO buyer_sessions (session_id, buyer_id, active_cart_id) "
-                "VALUES (%s, %s, %s)",
-                (session_id, buyer_id, active_cart_id)
             )
             
             conn.commit()
@@ -470,6 +471,92 @@ class CustomerDBServicer(customer_db_pb2_grpc.CustomerDBServiceServicer):
             return customer_db_pb2.UpdateBuyerSessionTimestampResponse(success=False)
         finally:
             self.db_pool.putconn(conn)
+
+    def InsertTransaction(self, request, context):
+        """Insert transaction"""
+        conn = self.db_pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+            cursor.execute(
+                "INSERT INTO transactions (buyer_id, cardholder_name, card_number, expiry_month, expiry_year, security_code, amount) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING transaction_id",
+                (request.buyer_id, request.cardholder_name, request.card_number, request.expiry_month, request.expiry_year, request.security_code, request.amount)
+            )
+            result = cursor.fetchone()
+            conn.commit()
+
+            return customer_db_pb2.InsertTransactionResponse(
+                success=True,
+                transaction_id = result["transaction_id"],
+            )
+        except Exception as e:
+            conn.rollback()
+            print(f"Error in InsertTransaction: {e}")
+            return customer_db_pb2.InsertTransactionResponse(
+                success=False,
+                error_message=str(e)
+            )
+        finally:
+            self.db_pool.putconn(conn)
+
+    def InsertPurchase(self, request, context):
+        """Insert purchase"""
+        conn = self.db_pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+            cursor.execute(
+                "INSERT INTO purchases (buyer_id, transaction_id, item_ids) VALUES (%s, %s, %s) RETURNING purchase_id",
+                (request.buyer_id, request.transaction_id, list(request.item_ids))
+            )
+            result = cursor.fetchone()
+            conn.commit()
+
+            return customer_db_pb2.InsertPurchaseResponse(
+                success=True,
+                purchase_id=result["purchase_id"]
+            )
+        except Exception as e:
+            conn.rollback()
+            print(f"Error in InsertPurchase: {e}")
+            return customer_db_pb2.InsertPurchaseResponse(
+                success=False,
+                error_message=str(e)
+            )
+        finally:
+            self.db_pool.putconn(conn)
+
+    def GetBuyerPurchases(self, request, context):
+        """Insert purchase"""
+        conn = self.db_pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+            cursor.execute(
+                "SELECT purchase_id, item_ids FROM purchases WHERE buyer_id = %s",
+                (request.buyer_id,)
+            )
+            conn.commit()
+            result = cursor.fetchall()
+
+            purchases = []
+            for row in result:
+                purchases.append(customer_db_pb2.PurchaseRecord(
+                    purchase_id = row["purchase_id"],
+                    item_ids = row["item_ids"]
+                ))
+
+            return customer_db_pb2.GetBuyerPurchasesResponse(
+                success=True,
+                purchases=purchases
+            )
+        except Exception as e:
+            conn.rollback()
+            print(f"Error in GetBuyerPurchases: {e}")
+            return customer_db_pb2.GetBuyerPurchasesResponse(
+                success=False,
+                error_message=str(e)
+            )
+        finally:
+            self.db_pool.putconn(conn)
+
 
     # ========== Cart Operations ==========
 

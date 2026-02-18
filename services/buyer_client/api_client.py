@@ -1,6 +1,7 @@
 # API client for communicating with buyer server using REST
 
 import requests
+
 try:
     from .session import BuyerSession
 except ImportError:
@@ -176,10 +177,25 @@ class BuyerAPIClient:
             print(f"Error displaying cart: {e}")
             return {"status": "Error", "message": f"Connection error: {e}"}
 
-    def make_purchase(self):
+    def make_purchase(self, session: BuyerSession, cardholder_name: str, card_number: str, expiry_month: int, expiry_year: int, security_code: str):
         """Function to send REST request to make purchase (stubbed)"""
-        # To be implemented in future
-        pass
+        try:
+            response = self.session.post(
+                f"{self.base_url}/buyers/purchases",
+                json={
+                    "cardholder_name": cardholder_name,
+                    "card_number": card_number,
+                    "expiry_month": expiry_month,
+                    "expiry_year": expiry_year,
+                    "security_code": security_code
+                },
+                headers = self.get_headers(),
+                timeout=self.session.timeout
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error making purchase: {e}")
+            return {"status": "Error", "message":f"Connection error: {e}"}
 
     def provide_feedback(self, session: BuyerSession, item_id: int, feedback: int):
         """Function to send REST request to provide feedback"""
@@ -208,7 +224,15 @@ class BuyerAPIClient:
             print(f"Error getting seller rating: {e}")
             return {"status": "Error", "message": f"Connection error: {e}"}
 
-    def get_buyer_purchases(self):
+    def get_buyer_purchases(self, session: BuyerSession):
         """Function to send REST request to get buyer purchases (stubbed)"""
-        # To be implemented in future
-        pass
+        try:
+            response = self.session.get(
+                f"{self.base_url}/buyers/purchases",
+                headers=self.get_headers(),
+                timeout=self.session.timeout
+            )
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error getting buyer purchases: {e}")
+            return {"status": "Error", "message": f"Connection error: {e}"}

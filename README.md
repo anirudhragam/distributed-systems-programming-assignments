@@ -178,9 +178,11 @@ python performance_tests.py --num-sellers 10 --num-buyers 10 > results_10x10.txt
 python performance_tests.py --num-sellers 100 --num-buyers 100 > results_100x100.txt 2>&1 | tee results_100x100.txt
 ```
 
+# Generate gRPC code
 
+python -m grpc_tools.protoc -I./protos --python_out=./generated --grpc_python_out=./generated ./protos/customer_db.proto
 
-
+python -m grpc_tools.protoc -I./protos --python_out=./generated --grpc_python_out=./generated ./protos/product_db.proto
 
 
 

@@ -52,7 +52,7 @@ CREATE TABLE saved_carts (
 
 CREATE TABLE transactions (
     transaction_id SERIAL PRIMARY KEY,
-    buyer_id INTEGER NOT NULL REFERENCES buyers(buyers_id),
+    buyer_id INTEGER NOT NULL REFERENCES buyers(buyer_id),
     amount NUMERIC(10, 2) NOT NULL,
     cardholder_name VARCHAR NOT NULL,
     card_number VARCHAR(16) NOT NULL,
@@ -64,7 +64,7 @@ CREATE TABLE transactions (
 
 CREATE TABLE purchases (
     purchase_id SERIAL PRIMARY KEY,
-    buyer_id INTEGER NOT NULL REFERENCES buyers(buyers_id),
+    buyer_id INTEGER NOT NULL REFERENCES buyers(buyer_id),
     transaction_id INTEGER NOT NULL REFERENCES transactions(transaction_id),
     item_ids INTEGER[] NOT NULL
 );

@@ -2,11 +2,12 @@
 gRPC server for Product Database
 Wraps PostgreSQL operations with gRPC service
 """
-import grpc
-from concurrent import futures
-from psycopg2 import pool, extras
 import os
 import sys
+from concurrent import futures
+
+import grpc
+from psycopg2 import extras, pool
 
 # Add generated code to path
 sys.path.insert(0, '/app/generated')
@@ -153,7 +154,7 @@ class ProductDBServicer(product_db_pb2_grpc.ProductDBServiceServicer):
             
             product_list = []
             for item in items:
-                product_list.append(product_db_pb2.Product(
+                product_list.append(product_db_pb2.Item(
                     item_id=item["item_id"],
                     seller_id=item["seller_id"],
                     item_name=item["item_name"],
@@ -206,7 +207,7 @@ class ProductDBServicer(product_db_pb2_grpc.ProductDBServiceServicer):
             
             product_list = []
             for item in items:
-                product_list.append(product_db_pb2.Product(
+                product_list.append(product_db_pb2.Item(
                     item_id=item["item_id"],
                     seller_id=item["seller_id"],
                     item_name=item["item_name"],
@@ -251,7 +252,7 @@ class ProductDBServicer(product_db_pb2_grpc.ProductDBServiceServicer):
                     error_message="Item not found"
                 )
             
-            product = product_db_pb2.Product(
+            product = product_db_pb2.Item(
                 item_id=item["item_id"],
                 seller_id=item["seller_id"],
                 item_name=item["item_name"],

@@ -312,17 +312,17 @@ def display_items_for_sale(session_id, seller_id):
 
         # Convert protobuf Product messages to dict
         items = []
-        for product in response.products:
+        for item in response.items:
             items.append({
-                "item_id": product.item_id,
-                "item_name": product.item_name,
-                "category": product.category,
-                "keywords": list(product.keywords),
-                "condition": product.condition,
-                "sale_price": product.sale_price,
-                "quantity": product.quantity,
-                "thumbs_up": product.thumbs_up,
-                "thumbs_down": product.thumbs_down
+                "item_id": item.item_id,
+                "item_name": item.item_name,
+                "category": item.category,
+                "keywords": list(item.keywords),
+                "condition": item.condition,
+                "sale_price": item.sale_price,
+                "quantity": item.quantity,
+                "thumbs_up": item.thumbs_up,
+                "thumbs_down": item.thumbs_down
             })
 
         if not items:

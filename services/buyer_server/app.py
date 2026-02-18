@@ -2,25 +2,22 @@
 Flask-based RESTful API server for buyer operations (gRPC-based)
 """
 import os
-import grpc
 import sys
-from flask import Flask, request, jsonify
+
+import grpc
+from flask import Flask, jsonify, request
 
 # Add generated protobuf path
 sys.path.insert(0, '/app/generated')
-import product_db_pb2
-import product_db_pb2_grpc
-import customer_db_pb2
-import customer_db_pb2_grpc
-
-import auth
 import uuid
 
+import auth
+import customer_db_pb2
+import customer_db_pb2_grpc
+import product_db_pb2
+import product_db_pb2_grpc
 import requests
 from zeep import Client
-
-# Define extension to convert DECIMAL to FLOAT
-DEC2FLOAT = extensions.new_type(_psycopg.DECIMAL.values, "DEC2FLOAT", extensions.FLOAT)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -30,11 +27,13 @@ product_db_channel = None
 product_db_stub = None
 customer_db_channel = None
 customer_db_stub = None
+soap_client = None
 
+SOAP_WSDL = "http://financial-transactions:8000/?wsdl"
 
 def init_grpc_clients():
     """Initialize gRPC client stubs for database services"""
-    global product_db_channel, product_db_stub, customer_db_channel, customer_db_stub
+    global product_db_channel, product_db_stub, customer_db_channel, customer_db_stub, soap_client
 
     # Create persistent gRPC channels
     product_db_channel = grpc.insecure_channel('product-db:50051')
@@ -47,35 +46,7 @@ def init_grpc_clients():
     auth.set_customer_db_stub(customer_db_stub)
 
     print("Buyer server initialized with gRPC clients")
-
-
-SOAP_WSDL = "http://financial-transactions:8000/?wsdl"
-soap_client = Client(SOAP_WSDL)
-
-# Initialize database connection pools
-product_db_pool = pool.ThreadedConnectionPool(
-    minconn=50,
-    maxconn=100,
-    user="product_user",
-    password="product_password",
-    host="product-db",
-    port="5432",
-    database="product_db",
-)
-
-customer_db_pool = pool.ThreadedConnectionPool(
-    minconn=50,
-    maxconn=100,
-    user="customer_user",
-    password="customer_password",
-    host="customer-db",
-    port="5432",
-    database="customer_db",
-)
-
-# Register PostgreSQL extensions
-extras.register_uuid()
-extensions.register_type(DEC2FLOAT)
+    soap_client = Client(SOAP_WSDL)
 
 @app.route('/api/buyers/accounts', methods=['POST'])
 def create_account():
@@ -199,7 +170,7 @@ def search_items(session_id, buyer_id):
 
         # Convert protobuf Product messages to dict
         results = []
-        for product in response.products:
+        for product in response.items:
             results.append({
                 "item_id": product.item_id,
                 "seller_id": product.seller_id,
@@ -242,16 +213,16 @@ def get_item(session_id, buyer_id, item_id):
 
         # Convert protobuf Product to dict
         result = {
-            "item_id": response.product.item_id,
-            "seller_id": response.product.seller_id,
-            "item_name": response.product.item_name,
-            "category": response.product.category,
-            "keywords": list(response.product.keywords),
-            "condition": response.product.condition,
-            "sale_price": response.product.sale_price,
-            "quantity": response.product.quantity,
-            "thumbs_up": response.product.thumbs_up,
-            "thumbs_down": response.product.thumbs_down
+            "item_id": response.item.item_id,
+            "seller_id": response.item.seller_id,
+            "item_name": response.item.item_name,
+            "category": response.item.category,
+            "keywords": list(response.item.keywords),
+            "condition": response.item.condition,
+            "sale_price": response.item.sale_price,
+            "quantity": response.item.quantity,
+            "thumbs_up": response.item.thumbs_up,
+            "thumbs_down": response.item.thumbs_down
         }
 
         return jsonify({
@@ -458,7 +429,7 @@ def display_cart(session_id, buyer_id):
 @app.route('/api/buyers/purchases', methods=['POST'])
 @auth.require_auth(user_type='buyer')
 def make_purchase(session_id, buyer_id):
-    """Make a purchase (stubbed)"""
+    """Make a purchase"""
     data = request.json
     cardholder_name = data.get("cardholder_name")
     card_number = data.get("card_number")
@@ -466,55 +437,53 @@ def make_purchase(session_id, buyer_id):
     expiry_year = data.get("expiry_year")
     security_code = data.get("security_code")
 
-    customer_db_conn = customer_db_pool.getconn()
-    product_db_conn = product_db_pool.getconn()
     try:
-        product_cursor = product_db_conn.cursor(cursor_factory=extras.RealDictCursor)
-        customer_cursor = customer_db_conn.cursor(cursor_factory=extras.RealDictCursor)
+        request_msg = customer_db_pb2.GetCartRequest(session_id=session_id)
+        response = customer_db_stub.GetCart(request_msg)
 
-        customer_cursor.execute(
-            "SELECT username FROM buyers WHERE buyer_id  = %s",
-            (buyer_id,),
-        )
-        result = customer_cursor.fetchone()
-
-        if not result:
-            return jsonify({
-                "status": "Error",
-                "message": "Cannot find buyer with buyer id."
-            }), 404
-
-        customer_cursor.execute(
-            "SELECT active_cart_items FROM active_carts WHERE session_id = %s",
-            (session_id,)
-        )
-        active_cart_result = customer_cursor.fetchone()
-
-        if not active_cart_result:
-            return jsonify({
-                "status": "Error",
-                "message": "Active cart does not exist."
-            }), 404
-
-        total_amount = 0
-        item_ids = []
-        for row in active_cart_result:
-            item_id, quantity = row["item_id"], row["quantity"]
-            product_cursor.execute(
-                "SELECT sale_price FROM products WHERE item_id = %s AND quantity > %s",
-                (item_id, quantity)
-            )
-            sale_price_result = product_cursor.fetchone()
-
-            if not sale_price_result:
+        if not response.success:
+            if "does not exist" in response.error_message.lower():
                 return jsonify({
                     "status": "Error",
-                    "message": "Item does not exist or quantity is too low."
+                    "message": "Cart does not exist for this session."
+                }), 404
+            return jsonify({
+                "status": "Error",
+                "message": response.error_message
+            }), 500
+
+        # Convert protobuf map to dict
+        cart_dict = dict(response.cart_items.items)
+
+        amount = 0
+        item_ids = []
+        update_quantity_request_msgs = []
+        for item_id_str, quantity in cart_dict.items():
+            item_id = int(item_id_str)
+
+            request_msg = product_db_pb2.GetItemRequest(item_id=item_id)
+            item_response = product_db_stub.GetItem(request_msg)
+
+            if not item_response.success:
+                return jsonify({
+                    "status": "Error",
+                    "message": "Item not found."
                 }), 404
 
-            sale_price = sale_price_result["sale_price"]
-            total_amount += sale_price * quantity
+            if item_response.item.quantity < quantity:
+                return jsonify({
+                    "status": "Error",
+                    "message": f"Available quantity of item {item_id} is less than the requested quantity."
+                }), 404
+
+            amount += item_response.item.sale_price * quantity
             item_ids.append(item_id)
+            
+            update_quantity_request_msgs.append(product_db_pb2.UpdateItemQuantityRequest(
+                item_id=item_id,
+                seller_id=item_response.item.seller_id,
+                quantity_change=-quantity
+            ))
         
         result = soap_client.service.process_payment(cardholder_name, card_number, expiry_month, expiry_year, security_code)
 
@@ -524,40 +493,76 @@ def make_purchase(session_id, buyer_id):
                 "message": "Payment declined."
             }), 401
         elif result == "Yes":
-            customer_cursor.execute(
-                "INSERT INTO transactions (buyer_id, cardholder_name, card_number, expiry_month, expiry_year, security_code, amount) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING transaction_id",
-                (buyer_id, cardholder_name, card_number, expiry_month, expiry_year, security_code, amount)
+            request_msg = customer_db_pb2.InsertTransactionRequest(
+                buyer_id = buyer_id,
+                cardholder_name = cardholder_name,
+                card_number = card_number,
+                expiry_month = expiry_month,
+                expiry_year = expiry_year,
+                security_code = security_code,
+                amount = amount,
             )
-            transaction_id = cursor.fetchone()["transaction_id"]
+            transaction_response = customer_db_stub.InsertTransaction(request_msg)
+            transaction_id = transaction_response.transaction_id
 
-            customer_cursor.execute(
-                "INSERT INTO purchases (buyer_id, transaction_id, item_ids) VALUES (%s, %s, %s) RETURNING purchase_id",
-                (buyer_id, transaction_id, item_ids)
+            request_msg = customer_db_pb2.InsertPurchaseRequest(
+                buyer_id = buyer_id,
+                transaction_id = transaction_id,
+                item_ids = item_ids
             )
-            purchase_id = cursor.fetchone()["purchase_id"]
+            purchase_response = customer_db_stub.InsertPurchase(request_msg)
 
+            # Maybe better to have a bulk update quantity gRPC?
             # update products quantities
-            # clear active cart
+            for request_msg in update_quantity_request_msgs:
+                response = product_db_stub.UpdateItemQuantity(request_msg)
+
+                if not response.success:
+                    return jsonify({
+                        "status": "Error",
+                        "message": f"Error updating quantity for item {request_msg.item_id}"
+                    })
+
+                    # mark transaction failed
+                    # rollback updated quantities
+
+            try:
+                request_msg = customer_db_pb2.ClearCartRequest(
+                    session_id=session_id,
+                    buyer_id=buyer_id
+                )
+                response = customer_db_stub.ClearCart(request_msg)
+
+                if not response.success:
+                    return jsonify({
+                        "status": "Error",
+                        "message": response.error_message
+                    }), 500
+
+            except grpc.RpcError as e:
+                print(f"gRPC error clearing cart: {e.code()} - {e.details()}")
+                return jsonify({
+                    "status": "Error",
+                    "message": "Failed to clear cart."
+                }), 500
 
             return jsonify({
                 "status": "OK",
                 "message": "Payment successful.",
                 "transaction_id": transaction_id,
-                "purchase_id": purchase_id
+                "purchase_id": purchase_response.purchase_id
             }), 200
-
-        return jsonify({
-            "status": "OK",
-            "message": "Unknown error while processing payment. Failed to make purchase."
-        }), 401
+        else:
+            return jsonify({
+                "status": "OK",
+                "message": "Unknown error while processing payment. Failed to make purchase."
+            }), 401
 
     except Exception as e:
         return jsonify({
             "status": "Error",
             "message": "Failed to make purchase."
         }), 500
-    finally:
-        customer_db_pool.putconn(customer_db_conn)
 
 
 @app.route('/api/buyers/feedback', methods=['POST'])
@@ -657,11 +662,21 @@ def get_seller_rating(session_id, buyer_id, seller_id):
 @app.route('/api/buyers/purchases', methods=['GET'])
 @auth.require_auth(user_type='buyer')
 def get_buyer_purchases(session_id, buyer_id):
-    """Get buyer purchase history (stubbed)"""
-    return jsonify({
-        "status": "OK",
-        "purchases": {}
-    }), 200
+    """Get buyer purchase history"""
+    try:
+        request_msg = customer_db_pb2.GetBuyerPurchasesRequest(
+            buyer_id = buyer_id
+        )
+        response = customer_db_stub.GetBuyerPurchases(request_msg)
+
+        purchases = [{"purchase_id": p.purchase_id, "item_ids": list(p.item_ids)} for p in response.purchases]
+        return jsonify({"status": "OK", "purchases": purchases}), 200
+    except grpc.RpcError as e:
+        print(f"gRPC error getting buyer purchases: {e.code()} - {e.details()}")
+        return jsonify({
+            "status": "Error",
+            "message": "Failed to get buyer purchases."
+        }), 500
 
 
 if __name__ == "__main__":
