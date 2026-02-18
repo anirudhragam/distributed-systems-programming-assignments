@@ -47,6 +47,7 @@ def init_grpc_clients():
 
     print("Buyer server initialized with gRPC clients")
     soap_client = Client(SOAP_WSDL)
+    soap_client.service._binding_options["address"] = "http://financial-transactions:8000/"
 
 @app.route('/api/buyers/accounts', methods=['POST'])
 def create_account():
@@ -567,9 +568,10 @@ def make_purchase(session_id, buyer_id):
             }), 401
 
     except Exception as e:
+        print(f"Error in make_purchase: {type(e).__name__}: {e}")
         return jsonify({
             "status": "Error",
-            "message": "Failed to make purchase."
+            "message": f"Failed to make purchase: {e}"
         }), 500
 
 
