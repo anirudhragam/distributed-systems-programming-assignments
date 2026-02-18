@@ -640,7 +640,7 @@ class CustomerDBServicer(customer_db_pb2_grpc.CustomerDBServiceServicer):
         finally:
             self.db_pool.putconn(conn)
 
-    def GetCart(self, request, context):
+    def GetActiveCart(self, request, context):
         """Get active cart items"""
         conn = self.db_pool.getconn()
         try:
@@ -656,13 +656,42 @@ class CustomerDBServicer(customer_db_pb2_grpc.CustomerDBServiceServicer):
                 for item_id, quantity in result["active_cart_items"].items():
                     cart_items.items[str(item_id)] = int(quantity)
             
-            return customer_db_pb2.GetCartResponse(
+            return customer_db_pb2.GetActiveCartResponse(
                 success=True,
                 cart_items=cart_items
             )
         except Exception as e:
-            print(f"Error in GetCart: {e}")
-            return customer_db_pb2.GetCartResponse(
+            print(f"Error in GetActiveCart: {e}")
+            return customer_db_pb2.GetActiveCartResponse(
+                success=False,
+                error_message=str(e)
+            )
+        finally:
+            self.db_pool.putconn(conn)
+
+    def GetSavedCart(self, request, context):
+        """Get saved cart items"""
+        conn = self.db_pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+            cursor.execute(
+                "SELECT saved_cart_items FROM saved_carts WHERE buyer_id = %s",
+                (request.buyer_id,)
+            )
+            result = cursor.fetchone()
+            
+            cart_items = customer_db_pb2.CartItems()
+            if result and result["saved_cart_items"]:
+                for item_id, quantity in result["saved_cart_items"].items():
+                    cart_items.items[str(item_id)] = int(quantity)
+            
+            return customer_db_pb2.GetSavedCartResponse(
+                success=True,
+                cart_items=cart_items
+            )
+        except Exception as e:
+            print(f"Error in GetSavedCart: {e}")
+            return customer_db_pb2.GetSavedCartResponse(
                 success=False,
                 error_message=str(e)
             )

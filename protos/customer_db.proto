@@ -154,11 +154,21 @@ message RemoveItemFromCartResponse {
   string error_message = 2;
 }
 
-message GetCartRequest {
+message GetActiveCartRequest {
   string session_id = 1;
 }
 
-message GetCartResponse {
+message GetActiveCartResponse {
+  bool success = 1;
+  CartItems cart_items = 2;
+  string error_message = 3;
+}
+
+message GetSavedCartRequest {
+  int32 buyer_id = 1;
+}
+
+message GetSavedCartResponse {
   bool success = 1;
   CartItems cart_items = 2;
   string error_message = 3;
@@ -251,7 +261,8 @@ service CustomerDBService {
   // Cart operations
   rpc AddItemToCart(AddItemToCartRequest) returns (AddItemToCartResponse);
   rpc RemoveItemFromCart(RemoveItemFromCartRequest) returns (RemoveItemFromCartResponse);
-  rpc GetCart(GetCartRequest) returns (GetCartResponse);
+  rpc GetActiveCart(GetActiveCartRequest) returns (GetActiveCartResponse);
+  rpc GetSavedCart(GetSavedCartRequest) returns (GetSavedCartResponse);
   rpc SaveCart(SaveCartRequest) returns (SaveCartResponse);
   rpc ClearCart(ClearCartRequest) returns (ClearCartResponse);
 

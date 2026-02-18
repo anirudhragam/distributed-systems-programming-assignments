@@ -106,10 +106,15 @@ class CustomerDBServiceStub(object):
                 request_serializer=customer__db__pb2.RemoveItemFromCartRequest.SerializeToString,
                 response_deserializer=customer__db__pb2.RemoveItemFromCartResponse.FromString,
                 _registered_method=True)
-        self.GetCart = channel.unary_unary(
-                '/customer_db.CustomerDBService/GetCart',
-                request_serializer=customer__db__pb2.GetCartRequest.SerializeToString,
-                response_deserializer=customer__db__pb2.GetCartResponse.FromString,
+        self.GetActiveCart = channel.unary_unary(
+                '/customer_db.CustomerDBService/GetActiveCart',
+                request_serializer=customer__db__pb2.GetActiveCartRequest.SerializeToString,
+                response_deserializer=customer__db__pb2.GetActiveCartResponse.FromString,
+                _registered_method=True)
+        self.GetSavedCart = channel.unary_unary(
+                '/customer_db.CustomerDBService/GetSavedCart',
+                request_serializer=customer__db__pb2.GetSavedCartRequest.SerializeToString,
+                response_deserializer=customer__db__pb2.GetSavedCartResponse.FromString,
                 _registered_method=True)
         self.SaveCart = channel.unary_unary(
                 '/customer_db.CustomerDBService/SaveCart',
@@ -230,7 +235,13 @@ class CustomerDBServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetCart(self, request, context):
+    def GetActiveCart(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSavedCart(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -340,10 +351,15 @@ def add_CustomerDBServiceServicer_to_server(servicer, server):
                     request_deserializer=customer__db__pb2.RemoveItemFromCartRequest.FromString,
                     response_serializer=customer__db__pb2.RemoveItemFromCartResponse.SerializeToString,
             ),
-            'GetCart': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetCart,
-                    request_deserializer=customer__db__pb2.GetCartRequest.FromString,
-                    response_serializer=customer__db__pb2.GetCartResponse.SerializeToString,
+            'GetActiveCart': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetActiveCart,
+                    request_deserializer=customer__db__pb2.GetActiveCartRequest.FromString,
+                    response_serializer=customer__db__pb2.GetActiveCartResponse.SerializeToString,
+            ),
+            'GetSavedCart': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSavedCart,
+                    request_deserializer=customer__db__pb2.GetSavedCartRequest.FromString,
+                    response_serializer=customer__db__pb2.GetSavedCartResponse.SerializeToString,
             ),
             'SaveCart': grpc.unary_unary_rpc_method_handler(
                     servicer.SaveCart,
@@ -762,7 +778,7 @@ class CustomerDBService(object):
             _registered_method=True)
 
     @staticmethod
-    def GetCart(request,
+    def GetActiveCart(request,
             target,
             options=(),
             channel_credentials=None,
@@ -775,9 +791,36 @@ class CustomerDBService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/customer_db.CustomerDBService/GetCart',
-            customer__db__pb2.GetCartRequest.SerializeToString,
-            customer__db__pb2.GetCartResponse.FromString,
+            '/customer_db.CustomerDBService/GetActiveCart',
+            customer__db__pb2.GetActiveCartRequest.SerializeToString,
+            customer__db__pb2.GetActiveCartResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSavedCart(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/customer_db.CustomerDBService/GetSavedCart',
+            customer__db__pb2.GetSavedCartRequest.SerializeToString,
+            customer__db__pb2.GetSavedCartResponse.FromString,
             options,
             channel_credentials,
             insecure,

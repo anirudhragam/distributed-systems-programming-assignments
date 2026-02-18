@@ -396,8 +396,8 @@ def clear_cart(session_id, buyer_id):
 def display_cart(session_id, buyer_id):
     """Display active cart"""
     try:
-        request_msg = customer_db_pb2.GetCartRequest(session_id=session_id)
-        response = customer_db_stub.GetCart(request_msg)
+        request_msg = customer_db_pb2.GetActiveCartRequest(session_id=session_id)
+        response = customer_db_stub.GetActiveCart(request_msg)
 
         if not response.success:
             if "does not exist" in response.error_message.lower():
@@ -438,8 +438,9 @@ def make_purchase(session_id, buyer_id):
     security_code = data.get("security_code")
 
     try:
-        request_msg = customer_db_pb2.GetCartRequest(session_id=session_id)
-        response = customer_db_stub.GetCart(request_msg)
+        print("Getting saved cart items")
+        request_msg = customer_db_pb2.GetSavedCartRequest(buyer_id=buyer_id)
+        response = customer_db_stub.GetSavedCart(request_msg)
 
         if not response.success:
             if "does not exist" in response.error_message.lower():
@@ -454,6 +455,13 @@ def make_purchase(session_id, buyer_id):
 
         # Convert protobuf map to dict
         cart_dict = dict(response.cart_items.items)
+        print(f"Got saved cart items: {cart_dict}")
+
+        if len(cart_dict) == 0:
+            return jsonify({
+                "status": "OK",
+                "message": "Saved Cart is empty."
+            }), 200
 
         amount = 0
         item_ids = []
@@ -482,7 +490,7 @@ def make_purchase(session_id, buyer_id):
             update_quantity_request_msgs.append(product_db_pb2.UpdateItemQuantityRequest(
                 item_id=item_id,
                 seller_id=item_response.item.seller_id,
-                quantity_change=-quantity
+                quantity_change=quantity
             ))
         
         result = soap_client.service.process_payment(cardholder_name, card_number, expiry_month, expiry_year, security_code)
@@ -554,7 +562,7 @@ def make_purchase(session_id, buyer_id):
             }), 200
         else:
             return jsonify({
-                "status": "OK",
+                "status": "Error",
                 "message": "Unknown error while processing payment. Failed to make purchase."
             }), 401
 
