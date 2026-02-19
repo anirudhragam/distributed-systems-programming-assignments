@@ -2,6 +2,7 @@
 Flask-based RESTful API server for seller operations (gRPC-based)
 """
 import os
+import time
 import grpc
 import sys
 from flask import Flask, request, jsonify
@@ -29,12 +30,32 @@ def init_grpc_clients():
     """Initialize gRPC client stubs for database services"""
     global product_db_channel, product_db_stub, customer_db_channel, customer_db_stub
 
-    # Create persistent gRPC channels
-    product_db_channel = grpc.insecure_channel('product-db:50051')
-    product_db_stub = product_db_pb2_grpc.ProductDBServiceStub(product_db_channel)
+    product_db_host = os.getenv("PRODUCT_DB_HOST", "product-db")
+    product_db_port = os.getenv("PRODUCT_DB_PORT", "50051")
+    customer_db_host = os.getenv("CUSTOMER_DB_HOST", "customer-db")
+    customer_db_port = os.getenv("CUSTOMER_DB_PORT", "50052")
 
-    customer_db_channel = grpc.insecure_channel('customer-db:50052')
-    customer_db_stub = customer_db_pb2_grpc.CustomerDBServiceStub(customer_db_channel)
+    for attempt in range(30):
+        try:
+            product_db_channel = grpc.insecure_channel(f'{product_db_host}:{product_db_port}')
+            product_db_stub = product_db_pb2_grpc.ProductDBServiceStub(product_db_channel)
+            grpc.channel_ready_future(product_db_channel).result(timeout=5)
+            print(f"Connected to product-db at {product_db_host}:{product_db_port}")
+            break
+        except grpc.FutureTimeoutError:
+            print(f"Waiting for product-db at {product_db_host}:{product_db_port} (attempt {attempt+1}/30)...")
+            time.sleep(10)
+
+    for attempt in range(30):
+        try:
+            customer_db_channel = grpc.insecure_channel(f'{customer_db_host}:{customer_db_port}')
+            customer_db_stub = customer_db_pb2_grpc.CustomerDBServiceStub(customer_db_channel)
+            grpc.channel_ready_future(customer_db_channel).result(timeout=5)
+            print(f"Connected to customer-db at {customer_db_host}:{customer_db_port}")
+            break
+        except grpc.FutureTimeoutError:
+            print(f"Waiting for customer-db at {customer_db_host}:{customer_db_port} (attempt {attempt+1}/30)...")
+            time.sleep(10)
 
     # Inject customer_db_stub into auth module
     auth.set_customer_db_stub(customer_db_stub)

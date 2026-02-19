@@ -3,6 +3,7 @@ Flask-based RESTful API server for buyer operations (gRPC-based)
 """
 import os
 import sys
+import time
 
 import grpc
 from flask import Flask, jsonify, request
@@ -29,25 +30,53 @@ customer_db_channel = None
 customer_db_stub = None
 soap_client = None
 
-SOAP_WSDL = "http://financial-transactions:8000/?wsdl"
+_ft_host = os.getenv("FINANCIAL_TRANSACTIONS_HOST", "financial-transactions")
+_ft_port = os.getenv("FINANCIAL_TRANSACTIONS_PORT", "8000")
+SOAP_WSDL = f"http://{_ft_host}:{_ft_port}/?wsdl"
+SOAP_ENDPOINT = f"http://{_ft_host}:{_ft_port}/"
 
 def init_grpc_clients():
     """Initialize gRPC client stubs for database services"""
     global product_db_channel, product_db_stub, customer_db_channel, customer_db_stub, soap_client
 
-    # Create persistent gRPC channels
-    product_db_channel = grpc.insecure_channel('product-db:50051')
-    product_db_stub = product_db_pb2_grpc.ProductDBServiceStub(product_db_channel)
+    product_db_host = os.getenv("PRODUCT_DB_HOST", "product-db")
+    product_db_port = os.getenv("PRODUCT_DB_PORT", "50051")
+    customer_db_host = os.getenv("CUSTOMER_DB_HOST", "customer-db")
+    customer_db_port = os.getenv("CUSTOMER_DB_PORT", "50052")
 
-    customer_db_channel = grpc.insecure_channel('customer-db:50052')
-    customer_db_stub = customer_db_pb2_grpc.CustomerDBServiceStub(customer_db_channel)
+    for attempt in range(30):
+        try:
+            product_db_channel = grpc.insecure_channel(f'{product_db_host}:{product_db_port}')
+            product_db_stub = product_db_pb2_grpc.ProductDBServiceStub(product_db_channel)
+            grpc.channel_ready_future(product_db_channel).result(timeout=5)
+            print(f"Connected to product-db at {product_db_host}:{product_db_port}")
+            break
+        except grpc.FutureTimeoutError:
+            print(f"Waiting for product-db at {product_db_host}:{product_db_port} (attempt {attempt+1}/30)...")
+            time.sleep(10)
+
+    for attempt in range(30):
+        try:
+            customer_db_channel = grpc.insecure_channel(f'{customer_db_host}:{customer_db_port}')
+            customer_db_stub = customer_db_pb2_grpc.CustomerDBServiceStub(customer_db_channel)
+            grpc.channel_ready_future(customer_db_channel).result(timeout=5)
+            print(f"Connected to customer-db at {customer_db_host}:{customer_db_port}")
+            break
+        except grpc.FutureTimeoutError:
+            print(f"Waiting for customer-db at {customer_db_host}:{customer_db_port} (attempt {attempt+1}/30)...")
+            time.sleep(10)
 
     # Inject customer_db_stub into auth module
     auth.set_customer_db_stub(customer_db_stub)
 
     print("Buyer server initialized with gRPC clients")
-    soap_client = Client(SOAP_WSDL)
-    soap_client.service._binding_options["address"] = "http://financial-transactions:8000/"
+    try:
+        soap_client = Client(SOAP_WSDL)
+        soap_client.service._binding_options["address"] = SOAP_ENDPOINT
+        print(f"Connected to financial-transactions at {SOAP_WSDL}")
+    except Exception as e:
+        print(f"Warning: financial-transactions unavailable ({e}). Payment processing disabled.")
+        soap_client = None
 
 @app.route('/api/buyers/accounts', methods=['POST'])
 def create_account():
@@ -494,6 +523,9 @@ def make_purchase(session_id, buyer_id):
                 quantity_change=quantity
             ))
         
+        if soap_client is None:
+            return jsonify({"status": "Error", "message": "Payment service unavailable."}), 503
+
         result = soap_client.service.process_payment(cardholder_name, card_number, expiry_month, expiry_year, security_code)
 
         if result == "No":

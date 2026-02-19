@@ -1,0 +1,45 @@
+variable "project_id" {
+  description = "GCP project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "GCP region"
+  type        = string
+  default     = "us-central1"
+}
+
+variable "zone" {
+  description = "GCP zone"
+  type        = string
+  default     = "us-central1-a"
+}
+
+variable "machine_type" {
+  description = "GCP machine type for all VMs"
+  type        = string
+  default     = "e2-medium"
+}
+
+variable "repo_url" {
+  description = "Git repository URL (HTTPS, publicly accessible)"
+  type        = string
+}
+
+variable "ssh_public_key" {
+  description = "SSH public key for VM access. Format: 'username:ssh-rsa AAAA...'"
+  type        = string
+  default     = ""
+}
+
+variable "product_db_internal_ip" {
+  description = "Reserved static internal IP for product-db-vm"
+  type        = string
+  default     = "10.128.0.10"
+}
+
+variable "customer_db_internal_ip" {
+  description = "Reserved static internal IP for customer-db-vm"
+  type        = string
+  default     = "10.128.0.11"
+}
