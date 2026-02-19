@@ -251,9 +251,7 @@ resource "google_compute_instance" "seller_server_vm" {
 
 
 # Buyer Server VM
-# Also runs financial-transactions (SOAP) on the same host.
-# Both containers use --network host so they communicate
-# over localhost without needing an exposed port.
+# financial-transactions (SOAP) runs locally only; not deployed to GCP.
 
 resource "google_compute_instance" "buyer_server_vm" {
   name         = "buyer-server-vm"
@@ -296,45 +294,21 @@ resource "google_compute_instance" "buyer_server_vm" {
     echo "=== [buyer-server-vm] Cloning repo ==="
     git clone ${var.repo_url} /opt/app
 
-    # Build financial-transactions first (buyer-server depends on it)
-    echo "=== [buyer-server-vm] Building financial-transactions image ==="
-    # Build context is the service directory (Dockerfile uses COPY . /app/)
-    docker build -t financial-transactions:latest \
-      -f /opt/app/services/financial_transactions/Dockerfile \
-      /opt/app/services/financial_transactions/
-
-    echo "=== [buyer-server-vm] Starting financial-transactions ==="
-    docker run -d \
-      --name financial-transactions \
-      --restart unless-stopped \
-      --network host \
-      financial-transactions:latest
-
-    echo "=== [buyer-server-vm] Waiting for SOAP WSDL to be available ==="
-    until curl -sf http://localhost:8000/?wsdl > /dev/null 2>&1; do
-      echo "  ...waiting for financial-transactions"
-      sleep 3
-    done
-    echo "=== [buyer-server-vm] financial-transactions is ready ==="
-
     echo "=== [buyer-server-vm] Building buyer-server image (build context: repo root) ==="
     cd /opt/app
     docker build -t buyer-server:latest -f services/buyer_server/Dockerfile .
 
     echo "=== [buyer-server-vm] Starting buyer-server ==="
-    # --network host lets buyer-server reach financial-transactions at localhost:8000
     docker run -d \
       --name buyer-server \
       --restart unless-stopped \
-      --network host \
+      -p 6000:6000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
       -e PRODUCT_DB_HOST="${google_compute_address.product_db_internal.address}" \
       -e PRODUCT_DB_PORT=50051 \
       -e CUSTOMER_DB_HOST="${google_compute_address.customer_db_internal.address}" \
       -e CUSTOMER_DB_PORT=50052 \
-      -e FINANCIAL_TRANSACTIONS_HOST=localhost \
-      -e FINANCIAL_TRANSACTIONS_PORT=8000 \
       buyer-server:latest
 
     echo "=== [buyer-server-vm] Startup complete ==="
