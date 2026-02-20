@@ -68,7 +68,7 @@ def run_seller_operations(seller_id: int):
             response_times.append(elapsed)
             
             if item_response.get('status') == 'OK':
-                item_id = item_response.get('item_id')
+                item_id = int(item_response.get('message').split(' ')[-1])
                 # Change price
                 start = time.time()
                 response = client.change_item_price(session, item_id, 15.0 + i)
