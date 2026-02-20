@@ -185,15 +185,25 @@ python -m grpc_tools.protoc -I./protos --python_out=./generated --grpc_python_ou
 python -m grpc_tools.protoc -I./protos --python_out=./generated --grpc_python_out=./generated ./protos/product_db.proto
 
 
-# Commands to run tests in test VM
+# Commands to run and debug tests in test VM
 gcloud compute ssh test-runner-vm --zone=us-west1-a
 cd /opt/app && source .env
-python3 performance_tests.py --num-sellers 1 --num-buyers 1
+curl -v http://$SELLER_SERVER:5000/api/health
+python3 performance_tests.py --num-sellers 1 --num-buyers 1 > ~/results_1x1.txt 2>&1 | tee ~/results_1x1.txt
+bash reset_dbs.sh
+
+python3 performance_tests.py --num-sellers 10 --num-buyers 10 2>&1 | tee ~/results_10x10.txt
+bash reset_dbs.sh
+
+python3 performance_tests.py --num-sellers 100 --num-buyers 100 2>&1 | tee ~/results_100x100.txt
 bash reset_dbs.sh
 
 
+gcloud compute ssh seller-server-vm --zone=us-west1-a --command="sudo docker logs seller-server"
 
+gcloud compute ssh buyer-server-vm --zone=us-west1-a --command="sudo docker logs buyer-server"
 
+gcloud compute ssh buyer-server-vm --zone=us-west1-a --command="sudo docker logs buyer-grpc-server"
 
 
 
