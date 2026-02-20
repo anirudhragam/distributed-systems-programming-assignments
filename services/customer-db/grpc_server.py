@@ -26,8 +26,8 @@ class CustomerDBServicer(customer_db_pb2_grpc.CustomerDBServiceServicer):
         print("Initializing Customer DB gRPC server...")
         # Create PostgreSQL connection pool
         self.db_pool = pool.ThreadedConnectionPool(
-            minconn=2,
-            maxconn=10,
+            minconn=50,
+            maxconn=100,
             user=os.getenv("POSTGRES_USER", "customer_user"),
             password=os.getenv("POSTGRES_PASSWORD", "customer_password"),
             host="localhost",  # PostgreSQL runs in same container
