@@ -18,7 +18,7 @@ variable "zone" {
 variable "machine_type" {
   description = "GCP machine type for all VMs"
   type        = string
-  default     = "e2-medium"
+  default     = "e2-standard-2"
 }
 
 variable "repo_url" {

@@ -23,7 +23,7 @@ class ProductDBServicer(product_db_pb2_grpc.ProductDBServiceServicer):
         print("Initializing Product DB gRPC server...")
         # Create PostgreSQL connection pool
         self.db_pool = pool.ThreadedConnectionPool(
-            minconn=50,
+            minconn=5,
             maxconn=100,
             user=os.getenv("POSTGRES_USER", "product_user"),
             password=os.getenv("POSTGRES_PASSWORD", "product_password"),
