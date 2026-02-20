@@ -31,15 +31,3 @@ variable "ssh_public_key" {
   type        = string
   default     = ""
 }
-
-variable "product_db_internal_ip" {
-  description = "Reserved static internal IP for product-db-vm"
-  type        = string
-  default     = "10.128.0.10"
-}
-
-variable "customer_db_internal_ip" {
-  description = "Reserved static internal IP for customer-db-vm"
-  type        = string
-  default     = "10.128.0.11"
-}

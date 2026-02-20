@@ -9,13 +9,13 @@ output "buyer_server_external_ip" {
 }
 
 output "product_db_internal_ip" {
-  description = "Reserved internal IP of the product-db VM"
-  value       = google_compute_address.product_db_internal.address
+  description = "Auto-assigned internal IP of the product-db VM"
+  value       = google_compute_instance.product_db_vm.network_interface[0].network_ip
 }
 
 output "customer_db_internal_ip" {
-  description = "Reserved internal IP of the customer-db VM"
-  value       = google_compute_address.customer_db_internal.address
+  description = "Auto-assigned internal IP of the customer-db VM"
+  value       = google_compute_instance.customer_db_vm.network_interface[0].network_ip
 }
 
 output "seller_server_url" {

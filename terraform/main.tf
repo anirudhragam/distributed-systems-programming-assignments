@@ -14,27 +14,6 @@ provider "google" {
 }
 
 
-# Static internal IP reservations for DB VMs
-
-resource "google_compute_address" "product_db_internal" {
-  name         = "product-db-internal-ip"
-  project      = var.project_id
-  region       = var.region
-  address_type = "INTERNAL"
-  subnetwork   = "default"
-  address      = var.product_db_internal_ip
-}
-
-resource "google_compute_address" "customer_db_internal" {
-  name         = "customer-db-internal-ip"
-  project      = var.project_id
-  region       = var.region
-  address_type = "INTERNAL"
-  subnetwork   = "default"
-  address      = var.customer_db_internal_ip
-}
-
-
 # Docker install script
 
 locals {
@@ -72,7 +51,6 @@ resource "google_compute_instance" "product_db_vm" {
   network_interface {
     network    = "default"
     subnetwork = "default"
-    network_ip = google_compute_address.product_db_internal.address
     access_config {} # Ephemeral external IP needed for outbound internet (apt-get, git clone, docker pull)
   }
 
@@ -135,7 +113,6 @@ resource "google_compute_instance" "customer_db_vm" {
   network_interface {
     network    = "default"
     subnetwork = "default"
-    network_ip = google_compute_address.customer_db_internal.address
     access_config {} # Ephemeral external IP needed for outbound internet (apt-get, git clone, docker pull)
   }
 
@@ -187,11 +164,9 @@ resource "google_compute_instance" "seller_server_vm" {
   zone         = var.zone
   project      = var.project_id
 
-  # Depend on address reservations so their IPs are known before
-  # this VM's startup script is rendered with the interpolated values.
   depends_on = [
-    google_compute_address.product_db_internal,
-    google_compute_address.customer_db_internal,
+    google_compute_instance.product_db_vm,
+    google_compute_instance.customer_db_vm,
   ]
 
   tags = ["seller-server", "ecommerce"]
@@ -235,9 +210,9 @@ resource "google_compute_instance" "seller_server_vm" {
       -p 5000:5000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=5000 \
-      -e PRODUCT_DB_HOST="${google_compute_address.product_db_internal.address}" \
+      -e PRODUCT_DB_HOST="${google_compute_instance.product_db_vm.network_interface[0].network_ip}" \
       -e PRODUCT_DB_PORT=50051 \
-      -e CUSTOMER_DB_HOST="${google_compute_address.customer_db_internal.address}" \
+      -e CUSTOMER_DB_HOST="${google_compute_instance.customer_db_vm.network_interface[0].network_ip}" \
       -e CUSTOMER_DB_PORT=50052 \
       seller-server:latest
 
@@ -260,8 +235,8 @@ resource "google_compute_instance" "buyer_server_vm" {
   project      = var.project_id
 
   depends_on = [
-    google_compute_address.product_db_internal,
-    google_compute_address.customer_db_internal,
+    google_compute_instance.product_db_vm,
+    google_compute_instance.customer_db_vm,
   ]
 
   tags = ["buyer-server", "ecommerce"]
@@ -319,9 +294,9 @@ resource "google_compute_instance" "buyer_server_vm" {
       -p 6000:6000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
-      -e PRODUCT_DB_HOST="${google_compute_address.product_db_internal.address}" \
+      -e PRODUCT_DB_HOST="${google_compute_instance.product_db_vm.network_interface[0].network_ip}" \
       -e PRODUCT_DB_PORT=50051 \
-      -e CUSTOMER_DB_HOST="${google_compute_address.customer_db_internal.address}" \
+      -e CUSTOMER_DB_HOST="${google_compute_instance.customer_db_vm.network_interface[0].network_ip}" \
       -e CUSTOMER_DB_PORT=50052 \
       -e FINANCIAL_TRANSACTIONS_HOST=financial-transactions \
       -e FINANCIAL_TRANSACTIONS_PORT=8000 \
@@ -391,8 +366,8 @@ export BUYER_SERVER="${google_compute_instance.buyer_server_vm.network_interface
 export BUYER_PORT=6000
 export SELLER_SERVER="${google_compute_instance.seller_server_vm.network_interface[0].access_config[0].nat_ip}"
 export SELLER_PORT=5000
-export PRODUCT_DB_IP="${google_compute_address.product_db_internal.address}"
-export CUSTOMER_DB_IP="${google_compute_address.customer_db_internal.address}"
+export PRODUCT_DB_IP="${google_compute_instance.product_db_vm.network_interface[0].network_ip}"
+export CUSTOMER_DB_IP="${google_compute_instance.customer_db_vm.network_interface[0].network_ip}"
 ENVEOF
   SCRIPT
 
