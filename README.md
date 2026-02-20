@@ -185,6 +185,11 @@ python -m grpc_tools.protoc -I./protos --python_out=./generated --grpc_python_ou
 python -m grpc_tools.protoc -I./protos --python_out=./generated --grpc_python_out=./generated ./protos/product_db.proto
 
 
+# Commands to run tests in test VM
+gcloud compute ssh test-runner-vm --zone=us-west1-a
+cd /opt/app && source .env
+python3 performance_tests.py --num-sellers 1 --num-buyers 1
+bash reset_dbs.sh
 
 
 

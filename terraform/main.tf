@@ -251,7 +251,7 @@ resource "google_compute_instance" "seller_server_vm" {
 
 
 # Buyer Server VM
-# financial-transactions (SOAP) runs locally only; not deployed to GCP.
+# financial-transactions (SOAP) runs on the same VM in a separate container.
 
 resource "google_compute_instance" "buyer_server_vm" {
   name         = "buyer-server-vm"
@@ -294,13 +294,27 @@ resource "google_compute_instance" "buyer_server_vm" {
     echo "=== [buyer-server-vm] Cloning repo ==="
     git clone ${var.repo_url} /opt/app
 
-    echo "=== [buyer-server-vm] Building buyer-server image (build context: repo root) ==="
+    # Create a Docker network so both containers can communicate by name
+    docker network create buyer-net
+
+    echo "=== [buyer-server-vm] Building financial-transactions image ==="
     cd /opt/app
+    docker build -t financial-transactions:latest -f services/financial_transactions/Dockerfile services/financial_transactions/
+
+    echo "=== [buyer-server-vm] Starting financial-transactions ==="
+    docker run -d \
+      --name financial-transactions \
+      --network buyer-net \
+      --restart unless-stopped \
+      financial-transactions:latest
+
+    echo "=== [buyer-server-vm] Building buyer-server image (build context: repo root) ==="
     docker build -t buyer-server:latest -f services/buyer_server/Dockerfile .
 
     echo "=== [buyer-server-vm] Starting buyer-server ==="
     docker run -d \
       --name buyer-server \
+      --network buyer-net \
       --restart unless-stopped \
       -p 6000:6000 \
       -e SERVER_HOST=0.0.0.0 \
@@ -309,9 +323,77 @@ resource "google_compute_instance" "buyer_server_vm" {
       -e PRODUCT_DB_PORT=50051 \
       -e CUSTOMER_DB_HOST="${google_compute_address.customer_db_internal.address}" \
       -e CUSTOMER_DB_PORT=50052 \
+      -e FINANCIAL_TRANSACTIONS_HOST=financial-transactions \
+      -e FINANCIAL_TRANSACTIONS_PORT=8000 \
       buyer-server:latest
 
     echo "=== [buyer-server-vm] Startup complete ==="
+  SCRIPT
+
+  service_account {
+    scopes = ["cloud-platform"]
+  }
+}
+
+
+# ─────────────────────────────────────────────────────────
+# Test Runner VM
+# ─────────────────────────────────────────────────────────
+
+resource "google_compute_instance" "test_runner_vm" {
+  name         = "test-runner-vm"
+  machine_type = var.machine_type
+  zone         = var.zone
+  project      = var.project_id
+
+  depends_on = [
+    google_compute_instance.seller_server_vm,
+    google_compute_instance.buyer_server_vm,
+  ]
+
+  tags = ["test-runner", "ecommerce"]
+
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-12"
+      size  = 10
+    }
+  }
+
+  network_interface {
+    network    = "default"
+    subnetwork = "default"
+    access_config {}
+  }
+
+  metadata = {
+    ssh-keys = var.ssh_public_key
+  }
+
+  metadata_startup_script = <<-SCRIPT
+    #!/bin/bash
+    set -e
+    exec > /var/log/startup.log 2>&1
+
+    echo "=== [test-runner-vm] Installing Python and dependencies ==="
+    apt-get update -y
+    apt-get install -y python3 python3-pip git curl
+
+    echo "=== [test-runner-vm] Cloning repo ==="
+    git clone ${var.repo_url} /opt/app
+    cd /opt/app
+
+    pip3 install requests --break-system-packages
+
+    # Write server addresses to env file for easy sourcing
+    cat > /opt/app/.env <<'ENVEOF'
+export BUYER_SERVER="${google_compute_instance.buyer_server_vm.network_interface[0].access_config[0].nat_ip}"
+export BUYER_PORT=6000
+export SELLER_SERVER="${google_compute_instance.seller_server_vm.network_interface[0].access_config[0].nat_ip}"
+export SELLER_PORT=5000
+export PRODUCT_DB_IP="${google_compute_address.product_db_internal.address}"
+export CUSTOMER_DB_IP="${google_compute_address.customer_db_internal.address}"
+ENVEOF
   SCRIPT
 
   service_account {

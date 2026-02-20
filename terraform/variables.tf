@@ -6,13 +6,13 @@ variable "project_id" {
 variable "region" {
   description = "GCP region"
   type        = string
-  default     = "us-central1"
+  default     = "us-west1"
 }
 
 variable "zone" {
   description = "GCP zone"
   type        = string
-  default     = "us-central1-a"
+  default     = "us-west1-a"
 }
 
 variable "machine_type" {
