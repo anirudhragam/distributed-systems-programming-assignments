@@ -24,6 +24,7 @@ variable "machine_type" {
 variable "repo_url" {
   description = "Git repository URL (HTTPS, publicly accessible)"
   type        = string
+  default     = "https://github.com/anirudhragam/distributed-systems-programming-assignments"
 }
 
 variable "ssh_public_key" {

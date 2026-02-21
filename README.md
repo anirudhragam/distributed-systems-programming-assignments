@@ -1,7 +1,9 @@
 # distributed-systems-programming-assignments
 Repository containing all the programming assignments for CSCI-5673: Distributed Systems Spring 2026.
 
-# System Design
+# Programming Assignment 1
+
+## System Design
 
 The overall system is structured logically as follows:
 
@@ -75,22 +77,69 @@ It then ensures that there is an active connection by sending requests to the se
 
     Optimization: Implement some locking mechanism
 
-### Reproduction Commands
+
+# Programming Assignment 2
+
+## System Design
+
+For this assignment, the overall system is structured logically the same as in Programming Assignment 1 and is as follows:
+
+Container 1: Seller CLI + API Client (Seller Frontend)
+
+Container 2: Seller Server (Seller Backend)
+
+Container 3: Buyer CLI + API Client (Buyer Frontend)
+
+Container 4: Buyer Server (Buyer Backend)
+
+Container 5: customer-db
+
+Container 6: product-db
+
+As directed, the communication layers have been updated for this assignment:
+1. Frontend -> Server: Changed from TCP sockets to REST APIs (HTTP)
+2. Server -> Database: Changed from TCP sockets to gRPC
+
+The buyer and seller servers are now Flask applications that handle HTTP requests from their respective clients. All inter-service communication between the servers and the databases is handled via gRPC stubs generated from .proto definitions.
+
+Each component is deployed as a separate Google Compute Engine (GCE) VM, provisioned automatically via Terraform. Each VM's startup script installs Docker, clones the repository, builds the relevant Docker image, and starts the container on boot.
+
+The buyer server and the financial-transactions service share a Docker network (buyer-net) on buyer-server-vm, allowing them to communicate by container name.
+
+The database VMs communicate with the application servers over GCP's internal VPC network using private IPs. The seller and buyer servers are reachable externally via their external public IPs.
+
+## Make and Get Purchase
+
+## Current state
+
+All the APIs have been tested and are working.
+
+## Reproduction Commands
+
+### Local setup
 Terminal 1:
 ```
 sh build_containers.sh
 docker-compose ps
 ```
+### Deploy to GCE instances
+Terminal 1:
+```
+cd terraform
+terraform init
+``` 
+Create a terraform.tfvars file containing the project ID of the GCP project as follows:
+```
+project_id = "<gcp_project_id>"
+```
 
-Terminal 2:
+Run the following command to deploy to GCE VMs
 ```
-docker exec -it seller_client_container python seller_cli.py
+terraform apply -var-file="terraform.tfvars"
 ```
 
-Terminal 3:
-```
-docker exec -it customer_db_container psql -U customer_user -d customer_db
-```
+
+### Debug Commands
 
 Terminal 4:
 ```
@@ -102,7 +151,7 @@ Terminal 5:
 docker exec -it buyer_client_container python buyer_cli.py
 ```
 
-## GCE creation commands:
+### GCE creation commands:
 
 Setup project and authenticate to gcloud with
 
@@ -178,14 +227,14 @@ python performance_tests.py --num-sellers 10 --num-buyers 10 > results_10x10.txt
 python performance_tests.py --num-sellers 100 --num-buyers 100 > results_100x100.txt 2>&1 | tee results_100x100.txt
 ```
 
-# Generate gRPC code
+### Generate gRPC code
 
 python -m grpc_tools.protoc -I./protos --python_out=./generated --grpc_python_out=./generated ./protos/customer_db.proto
 
 python -m grpc_tools.protoc -I./protos --python_out=./generated --grpc_python_out=./generated ./protos/product_db.proto
 
 
-# Commands to run and debug tests in test VM
+### Commands to run and debug tests in test VM
 gcloud compute ssh test-runner-vm --zone=us-west1-a
 cd /opt/app && source .env
 curl -v http://$SELLER_SERVER:5000/api/health
