@@ -92,9 +92,11 @@ Container 3: Buyer CLI + API Client (Buyer Frontend)
 
 Container 4: Buyer Server (Buyer Backend)
 
-Container 5: customer-db
+Container 5: Financial Transactions SOAP/WSDL payment processor 
 
-Container 6: product-db
+Container 6: customer-db
+
+Container 7: product-db
 
 As directed, the communication layers have been updated for this assignment:
 1. Frontend -> Server: Changed from TCP sockets to REST APIs (HTTP)
@@ -104,11 +106,50 @@ The buyer and seller servers are now Flask applications that handle HTTP request
 
 Each component is deployed as a separate Google Compute Engine (GCE) VM, provisioned automatically via Terraform. Each VM's startup script installs Docker, clones the repository, builds the relevant Docker image, and starts the container on boot.
 
-The buyer server and the financial-transactions service share a Docker network (buyer-net) on buyer-server-vm, allowing them to communicate by container name.
+The financial transactions service is a SOAP-based service which has a process_payment rpc which takes credit card details of the buyer as returns "Yes" with 90% probability and "No" with 10% probability.
+
+The buyer server container and the financial-transactions service container share a Docker network (buyer-net) on buyer-server-vm, allowing them to communicate by container name.
 
 The database VMs communicate with the application servers over GCP's internal VPC network using private IPs. The seller and buyer servers are reachable externally via their external public IPs.
 
-## Make and Get Purchase
+## Make and Get Buyer Purchases
+
+PA2 includes the implmentation of the MakePurchase and GetBuyerPurchases options for the buyer.
+
+Two tables are created to manage purchases:
+- Transaction table: stores the buyer id, transaction id, and credit card details used for the transaction
+- Purchases table: To make it easier to get the items IDs for a buyer's history of purchases, purchases table is creates which stores the buyer id, purchase id, transaction id, and the list of item IDs associated with the transaction.
+
+### MakePurchase
+
+- Buyer CLI prompts the input of card holder name, credit card number, expiry month, expiry year, and security code and sends the request to the Buyer API Client. 
+  - We decided to treat the name on card as separate from the buyer username because they may not always be the same. 
+  - The CLI performs input validation
+    - Card number must be 16 characters
+    - Expiry month must be an integer between 1 and 12
+    - Expiry year must be an integer between 1000 and 9999
+    - Security code must be 3 characters
+- Buyer API Client sends a HTTP POST request to the Buyer Server's `/api/buyers/purchases` REST endpoint
+- Buyer Server:
+   - Gets the saved card items for the buyer
+   - Verifies that the quantity of items in the saved card are available in the product catalog
+   - Calls the process payment rpc of the Financial Transactions service with the credit card details of the request.
+- The Financial Transaction server returns a Yes indicating a successful payment or No indication a failed payment
+- If the response in No, the Buyer Server returns a Payment Declined response
+- If the response is Yes, the Buyer Server:
+  - Inserts a new transaction entry into the transactions table in the customer db which has the buyer id, credit card details, and the total amount calculated as `amount += quantity[i] * item_sale_price[i]` for each item i in the saved cart
+  - Inserts a new purchase into the purchases table with the list of items ids bought, buyer id, and transaction id.
+  - Decrements the quantity of the available items in the product catalog
+  - Returns a Payment Successful response with the transaction ID and the puchase ID.
+
+### Get Buyer Purchases
+
+- Buyer CLI sends the session details to the buyer API client
+- Buyer API Client sends a HTTP GET request to the Buyer Server's `/api/buyers/purchases` REST endpoint
+- Buyer server makes a call to the gRPC endpoint of the customer db server.
+- gRPC server returns the purchases from the purchases table for the buyer id
+- Buyer server returns the HTTP response with the purchases
+- Buyer CLI displays the buyer's purchase history as purchase ID and the list of items IDS for each purchase ID
 
 ## Current state
 
