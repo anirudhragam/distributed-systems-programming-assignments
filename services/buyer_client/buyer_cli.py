@@ -416,9 +416,7 @@ class BuyerCLI:
     def run(self):
         """Main CLI loop"""
         print("\nBuyer Client initialised successfully!")
-        print(
-            f"API Server: {self.api_client.server_host}:{self.api_client.server_port}"
-        )
+        print(f"API Server: {self.api_client.base_url}")
 
         while True:
             try:
