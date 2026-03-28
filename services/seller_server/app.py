@@ -32,7 +32,7 @@ def init_grpc_clients():
 
     product_db_host = os.getenv("PRODUCT_DB_HOST", "product-db")
     product_db_port = os.getenv("PRODUCT_DB_PORT", "50051")
-    customer_db_host = os.getenv("CUSTOMER_DB_HOST", "customer-db")
+    customer_db_host = os.getenv("CUSTOMER_DB_HOST", "customer-db-0")
     customer_db_port = os.getenv("CUSTOMER_DB_PORT", "50052")
 
     for attempt in range(30):

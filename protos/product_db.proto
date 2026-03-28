@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package product_db;
 
-// Item message representing an item in the database
+
 message Item {
     int32 item_id = 1;
     int32 seller_id = 2;

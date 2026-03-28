@@ -1,29 +1,36 @@
-output "seller_server_external_ip" {
-  description = "External IP of the seller server VM"
-  value       = google_compute_instance.seller_server_vm.network_interface[0].access_config[0].nat_ip
+output "seller_server_addrs" {
+  description = "Comma-separated seller server addresses for SERVER_ADDRS env var"
+  value = join(",", [
+    "${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip}:5000",
+    "${google_compute_instance.vm2.network_interface[0].access_config[0].nat_ip}:5000",
+    "${google_compute_instance.vm3.network_interface[0].access_config[0].nat_ip}:5000",
+    "${google_compute_instance.vm4.network_interface[0].access_config[0].nat_ip}:5000",
+  ])
 }
 
-output "buyer_server_external_ip" {
-  description = "External IP of the buyer server VM"
-  value       = google_compute_instance.buyer_server_vm.network_interface[0].access_config[0].nat_ip
+output "buyer_server_addrs" {
+  description = "Comma-separated buyer server addresses for SERVER_ADDRS env var"
+  value = join(",", [
+    "${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip}:6000",
+    "${google_compute_instance.vm2.network_interface[0].access_config[0].nat_ip}:6000",
+    "${google_compute_instance.vm3.network_interface[0].access_config[0].nat_ip}:6000",
+    "${google_compute_instance.vm4.network_interface[0].access_config[0].nat_ip}:6000",
+  ])
 }
 
-output "product_db_internal_ip" {
-  description = "Auto-assigned internal IP of the product-db VM"
-  value       = google_compute_instance.product_db_vm.network_interface[0].network_ip
+output "vm1_external_ip" {
+  value = google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip
 }
 
-output "customer_db_internal_ip" {
-  description = "Auto-assigned internal IP of the customer-db VM"
-  value       = google_compute_instance.customer_db_vm.network_interface[0].network_ip
+output "vm2_external_ip" {
+  value = google_compute_instance.vm2.network_interface[0].access_config[0].nat_ip
 }
 
-output "seller_server_url" {
-  description = "Base URL for the seller REST API"
-  value       = "http://${google_compute_instance.seller_server_vm.network_interface[0].access_config[0].nat_ip}:5000"
+output "vm3_external_ip" {
+  value = google_compute_instance.vm3.network_interface[0].access_config[0].nat_ip
 }
 
-output "buyer_server_url" {
-  description = "Base URL for the buyer REST API"
-  value       = "http://${google_compute_instance.buyer_server_vm.network_interface[0].access_config[0].nat_ip}:6000"
+output "vm4_external_ip" {
+  value = google_compute_instance.vm4.network_interface[0].access_config[0].nat_ip
 }
+

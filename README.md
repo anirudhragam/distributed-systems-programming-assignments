@@ -296,6 +296,129 @@ gcloud compute ssh buyer-server-vm --zone=us-west1-a --command="sudo docker logs
 gcloud compute ssh buyer-server-vm --zone=us-west1-a --command="sudo docker logs buyer-grpc-server"
 
 
+### Curl Commands to make API requests to servers
+
+#### Seller Operations
+1. Create Seller Account
+```
+curl -s -X POST http://$SELLER:5000/api/sellers/accounts \
+  -H "Content-Type: application/json" \
+  -d '{"username": "seller1", "password": "password123"}' | python3 -m json.tool
+```
+2. Seller Login
+```
+curl -s -X POST http://$SELLER:5000/api/sellers/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"username": "seller1", "password": "password123"}' | python3 -m json.tool
+
+SESSION_ID=<session_id>
+```
+
+3. Register Item for Sale
+```
+curl -s -X POST http://$SELLER:5000/api/sellers/items \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $SELLER_SESSION" \
+  -d '{
+    "item_name": "Wireless Mouse",
+    "category": 2,
+    "keywords": ["wireless", "mouse", "usb"],
+    "condition": "New",
+    "sale_price": 29.99,
+    "quantity": 50
+  }' | python3 -m json.tool
+```
+
+4. Display All Seller Items
+```
+curl -s -X GET http://$SELLER:5000/api/sellers/items \
+  -H "Authorization: Bearer $SELLER_SESSION" | python3 -m json.tool
+```
+
+5. Update Item Quantity
+```
+curl -s -X PATCH http://$SELLER:5000/api/sellers/items/$ITEM_ID/quantity \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $SELLER_SESSION" \
+  -d '{"quantity_change": 10}' | python3 -m json.tool
+```
+6. Seller Logout
+```
+curl -s -X DELETE http://$SELLER:5000/api/sellers/sessions \
+  -H "Authorization: Bearer $SELLER_SESSION" | python3 -m json.tool
+```
+
+#### Buyer Operations
+1. Create Buyer Account
+```
+curl -s -X POST http://$BUYER:6000/api/buyers/accounts \
+  -H "Content-Type: application/json" \
+  -d '{"username": "buyer1", "password": "password123"}' | python3 -m json.tool
+```
+2. Buyer Login
+```
+curl -s -X POST http://$BUYER:6000/api/buyers/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"username": "buyer1", "password": "password123"}' | python3 -m json.tool
+
+BUYER_SESSION=<session_id>
+```
+3. Search Items by Category & Keywords
+```
+curl -s -X GET "http://$BUYER:6000/api/buyers/items/search?category=2&keywords=wireless&keywords=mouse" \
+  -H "Authorization: Bearer $BUYER_SESSION" | python3 -m json.tool
+```
+4. Get a Single Item by ID
+```
+curl -s -X GET http://$BUYER:6000/api/buyers/items/$ITEM_ID \
+  -H "Authorization: Bearer $BUYER_SESSION" | python3 -m json.tool
+```
+5. Display Active Cart
+```
+curl -s -X GET http://$BUYER:6000/api/buyers/cart \
+  -H "Authorization: Bearer $BUYER_SESSION" | python3 -m json.tool
+```
+6. Save Cart 
+```
+curl -s -X POST http://$BUYER:6000/api/buyers/cart/save \
+  -H "Authorization: Bearer $BUYER_SESSION" | python3 -m json.tool
+```
+
+7. Make Purchase
+```
+curl -s -X POST http://$BUYER:6000/api/buyers/purchases \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $BUYER_SESSION" \
+  -d '{
+    "cardholder_name": "John Doe",
+    "card_number": "4111111111111111",
+    "expiry_month": 12,
+    "expiry_year": 2025,
+    "security_code": "123"
+  }' | python3 -m json.tool
+```
+
+8. View Purchase History
+```
+curl -s -X GET http://$BUYER:6000/api/buyers/purchases \
+  -H "Authorization: Bearer $BUYER_SESSION" | python3 -m json.tool
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

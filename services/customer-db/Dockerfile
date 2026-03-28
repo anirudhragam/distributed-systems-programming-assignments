@@ -14,6 +14,7 @@ COPY services/customer-db/init-schema.sql /docker-entrypoint-initdb.d/
 COPY services/customer-db/grpc_server.py /app/
 COPY generated/ /app/generated/
 COPY services/customer-db/startup.sh /app/
+COPY services/customer-db/abp/ /app/abp/
 
 RUN chmod +x /app/startup.sh
 

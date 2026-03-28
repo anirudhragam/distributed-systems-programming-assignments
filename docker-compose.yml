@@ -7,7 +7,7 @@ services:
     container_name: product_db_container
     ports:
       - "5432:5432"    # PostgreSQL port
-      - "50051:50051"  # gRPC port (ADD THIS)
+      - "50051:50051"  # gRPC port
     environment:
       POSTGRES_DB: product_db
       POSTGRES_USER: product_user
@@ -22,20 +22,121 @@ services:
       timeout: 5s
       retries: 5
 
-  customer-db:
+  customer-db-0:
     build:
       context: .
       dockerfile: ./services/customer-db/Dockerfile
-    container_name: customer_db_container
+    container_name: customer_db_container_0
     ports:
       - "5433:5432"    # PostgreSQL port (mapped to 5433 on host)
-      - "50052:50052"  # gRPC port (ADD THIS)
+      - "50052:50052"  # gRPC port
     environment:
       POSTGRES_DB: customer_db
       POSTGRES_USER: customer_user
       POSTGRES_PASSWORD: customer_password
+      ABP_NODE_ID: 0
+      ABP_PEERS: customer-db-0:5100,customer-db-1:5100,customer-db-2:5100,customer-db-3:5100,customer-db-4:5100
+      ABP_UDP_PORT: 5100
     volumes:
-      - customer_db_data:/var/lib/postgresql/data
+      - customer_db_0_data:/var/lib/postgresql/data
+    networks:
+      - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  customer-db-1:
+    build:
+      context: .
+      dockerfile: ./services/customer-db/Dockerfile
+    container_name: customer_db_container_1
+    ports:
+      - "5434:5432"    # PostgreSQL port (mapped to 5434 on host)
+      - "50053:50052"  # gRPC port
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: customer_user
+      POSTGRES_PASSWORD: customer_password
+      ABP_NODE_ID: 1
+      ABP_PEERS: customer-db-0:5100,customer-db-1:5100,customer-db-2:5100,customer-db-3:5100,customer-db-4:5100
+      ABP_UDP_PORT: 5100
+    volumes:
+      - customer_db_1_data:/var/lib/postgresql/data
+    networks:
+      - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  customer-db-2:
+    build:
+      context: .
+      dockerfile: ./services/customer-db/Dockerfile
+    container_name: customer_db_container_2
+    ports:
+      - "5435:5432"    # PostgreSQL port (mapped to 5435 on host)
+      - "50054:50052"  # gRPC port
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: customer_user
+      POSTGRES_PASSWORD: customer_password
+      ABP_NODE_ID: 2
+      ABP_PEERS: customer-db-0:5100,customer-db-1:5100,customer-db-2:5100,customer-db-3:5100,customer-db-4:5100
+      ABP_UDP_PORT: 5100
+    volumes:
+      - customer_db_2_data:/var/lib/postgresql/data
+    networks:
+      - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  customer-db-3:
+    build:
+      context: .
+      dockerfile: ./services/customer-db/Dockerfile
+    container_name: customer_db_container_3
+    ports:
+      - "5436:5432"    # PostgreSQL port (mapped to 5436 on host)
+      - "50055:50052"  # gRPC port
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: customer_user
+      POSTGRES_PASSWORD: customer_password
+      ABP_NODE_ID: 3
+      ABP_PEERS: customer-db-0:5100,customer-db-1:5100,customer-db-2:5100,customer-db-3:5100,customer-db-4:5100
+      ABP_UDP_PORT: 5100
+    volumes:
+      - customer_db_3_data:/var/lib/postgresql/data
+    networks:
+      - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  customer-db-4:
+    build:
+      context: .
+      dockerfile: ./services/customer-db/Dockerfile
+    container_name: customer_db_container_4
+    ports:
+      - "5437:5432"    # PostgreSQL port (mapped to 5437 on host)
+      - "50056:50052"  # gRPC port
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: customer_user
+      POSTGRES_PASSWORD: customer_password
+      ABP_NODE_ID: 4
+      ABP_PEERS: customer-db-0:5100,customer-db-1:5100,customer-db-2:5100,customer-db-3:5100,customer-db-4:5100
+      ABP_UDP_PORT: 5100
+    volumes:
+      - customer_db_4_data:/var/lib/postgresql/data
     networks:
       - distributed_network
     healthcheck:
@@ -50,30 +151,129 @@ services:
       dockerfile: Dockerfile
     container_name: seller_client_container
     depends_on:
-      - seller_server
+      - seller-server-0
     environment:
-      SERVER_HOST: seller_server
-      SERVER_PORT: 5000
+      SERVER_ADDRS: "seller-server-0:5000,seller-server-1:5000,seller-server-2:5000,seller-server-3:5000"
     stdin_open: true
     tty: true
     networks:
       - distributed_network
 
-  seller_server:
+  seller-server-0:
     build:
       context: .
       dockerfile: ./services/seller_server/Dockerfile
-    container_name: seller_server_container
+    container_name: seller_server_container_0
     depends_on:
       product-db:
         condition: service_healthy
-      customer-db:
+      customer-db-0:
+        condition: service_healthy
+      customer-db-1:
+        condition: service_healthy
+      customer-db-2:
+        condition: service_healthy
+      customer-db-3:
+        condition: service_healthy
+      customer-db-4:
         condition: service_healthy
     ports:
       - "5001:5000"
     environment:
       SERVER_HOST: 0.0.0.0 # Listen on all interfaces
       SERVER_PORT: 5000
+      CUSTOMER_DB_HOST: customer-db-0
+      CUSTOMER_DB_PORT: 50052
+    stdin_open: true
+    tty: true
+    networks:
+      - distributed_network
+
+  seller-server-1:
+    build:
+      context: .
+      dockerfile: ./services/seller_server/Dockerfile
+    container_name: seller_server_container_1
+    depends_on:
+      product-db:
+        condition: service_healthy
+      customer-db-0:
+        condition: service_healthy
+      customer-db-1:
+        condition: service_healthy
+      customer-db-2:
+        condition: service_healthy
+      customer-db-3:
+        condition: service_healthy
+      customer-db-4:
+        condition: service_healthy
+    ports:
+      - "5002:5000"
+    environment:
+      SERVER_HOST: 0.0.0.0 # Listen on all interfaces
+      SERVER_PORT: 5000
+      CUSTOMER_DB_HOST: customer-db-0
+      CUSTOMER_DB_PORT: 50052
+    stdin_open: true
+    tty: true
+    networks:
+      - distributed_network
+
+  seller-server-2:
+    build:
+      context: .
+      dockerfile: ./services/seller_server/Dockerfile
+    container_name: seller_server_container_2
+    depends_on:
+      product-db:
+        condition: service_healthy
+      customer-db-0:
+        condition: service_healthy
+      customer-db-1:
+        condition: service_healthy
+      customer-db-2:
+        condition: service_healthy
+      customer-db-3:
+        condition: service_healthy
+      customer-db-4:
+        condition: service_healthy
+    ports:
+      - "5003:5000"
+    environment:
+      SERVER_HOST: 0.0.0.0 # Listen on all interfaces
+      SERVER_PORT: 5000
+      CUSTOMER_DB_HOST: customer-db-0
+      CUSTOMER_DB_PORT: 50052
+    stdin_open: true
+    tty: true
+    networks:
+      - distributed_network
+
+  seller-server-3:
+    build:
+      context: .
+      dockerfile: ./services/seller_server/Dockerfile
+    container_name: seller_server_container_3
+    depends_on:
+      product-db:
+        condition: service_healthy
+      customer-db-0:
+        condition: service_healthy
+      customer-db-1:
+        condition: service_healthy
+      customer-db-2:
+        condition: service_healthy
+      customer-db-3:
+        condition: service_healthy
+      customer-db-4:
+        condition: service_healthy
+    ports:
+      - "5004:5000"
+    environment:
+      SERVER_HOST: 0.0.0.0 # Listen on all interfaces
+      SERVER_PORT: 5000
+      CUSTOMER_DB_HOST: customer-db-0
+      CUSTOMER_DB_PORT: 50052
     stdin_open: true
     tty: true
     networks:
@@ -85,24 +285,31 @@ services:
       dockerfile: Dockerfile
     container_name: buyer_client_container
     depends_on:
-      - buyer_server
+      - buyer-server-0
     environment:
-      SERVER_HOST: buyer_server
-      SERVER_PORT: 6000
+      SERVER_ADDRS: "buyer-server-0:6000,buyer-server-1:6000,buyer-server-2:6000,buyer-server-3:6000"
     stdin_open: true
     tty: true
     networks:
       - distributed_network
 
-  buyer_server:
+  buyer-server-0:
     build:
       context: .
       dockerfile: ./services/buyer_server/Dockerfile
-    container_name: buyer_server_container
+    container_name: buyer_server_container_0
     depends_on:
       product-db:
         condition: service_healthy
-      customer-db:
+      customer-db-0:
+        condition: service_healthy
+      customer-db-1:
+        condition: service_healthy
+      customer-db-2:
+        condition: service_healthy
+      customer-db-3:
+        condition: service_healthy
+      customer-db-4:
         condition: service_healthy
       financial-transactions:
         condition: service_healthy
@@ -111,6 +318,105 @@ services:
     environment:
       SERVER_HOST: 0.0.0.0 # Listen on all interfaces
       SERVER_PORT: 6000
+      CUSTOMER_DB_HOST: customer-db-0
+      CUSTOMER_DB_PORT: 50052
+    stdin_open: true
+    tty: true
+    networks:
+      - distributed_network
+
+  buyer-server-1:
+    build:
+      context: .
+      dockerfile: ./services/buyer_server/Dockerfile
+    container_name: buyer_server_container_1
+    depends_on:
+      product-db:
+        condition: service_healthy
+      customer-db-0:
+        condition: service_healthy
+      customer-db-1:
+        condition: service_healthy
+      customer-db-2:
+        condition: service_healthy
+      customer-db-3:
+        condition: service_healthy
+      customer-db-4:
+        condition: service_healthy
+      financial-transactions:
+        condition: service_healthy
+    ports:
+      - "6002:6000"
+    environment:
+      SERVER_HOST: 0.0.0.0 # Listen on all interfaces
+      SERVER_PORT: 6000
+      CUSTOMER_DB_HOST: customer-db-0
+      CUSTOMER_DB_PORT: 50052
+    stdin_open: true
+    tty: true
+    networks:
+      - distributed_network
+
+
+  buyer-server-2:
+    build:
+      context: .
+      dockerfile: ./services/buyer_server/Dockerfile
+    container_name: buyer_server_container_2
+    depends_on:
+      product-db:
+        condition: service_healthy
+      customer-db-0:
+        condition: service_healthy
+      customer-db-1:
+        condition: service_healthy
+      customer-db-2:
+        condition: service_healthy
+      customer-db-3:
+        condition: service_healthy
+      customer-db-4:
+        condition: service_healthy
+      financial-transactions:
+        condition: service_healthy
+    ports:
+      - "6003:6000"
+    environment:
+      SERVER_HOST: 0.0.0.0 # Listen on all interfaces
+      SERVER_PORT: 6000
+      CUSTOMER_DB_HOST: customer-db-0
+      CUSTOMER_DB_PORT: 50052
+    stdin_open: true
+    tty: true
+    networks:
+      - distributed_network
+
+  buyer-server-3:
+    build:
+      context: .
+      dockerfile: ./services/buyer_server/Dockerfile
+    container_name: buyer_server_container_3
+    depends_on:
+      product-db:
+        condition: service_healthy
+      customer-db-0:
+        condition: service_healthy
+      customer-db-1:
+        condition: service_healthy
+      customer-db-2:
+        condition: service_healthy
+      customer-db-3:
+        condition: service_healthy
+      customer-db-4:
+        condition: service_healthy
+      financial-transactions:
+        condition: service_healthy
+    ports:
+      - "6004:6000"
+    environment:
+      SERVER_HOST: 0.0.0.0 # Listen on all interfaces
+      SERVER_PORT: 6000
+      CUSTOMER_DB_HOST: customer-db-0
+      CUSTOMER_DB_PORT: 50052
     stdin_open: true
     tty: true
     networks:
@@ -134,7 +440,11 @@ services:
 
 volumes:
   product_db_data:
-  customer_db_data:
+  customer_db_0_data:
+  customer_db_1_data:
+  customer_db_2_data:
+  customer_db_3_data:
+  customer_db_4_data:
 
 networks:
   distributed_network:

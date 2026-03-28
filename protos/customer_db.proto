@@ -2,7 +2,7 @@ syntax="proto3";
 
 package customer_db;
 
-// ========== Common Messages ==========
+//Common Messages
 
 message Rating {
   int32 thumbs_up = 1;
@@ -13,7 +13,7 @@ message CartItems {
   map<string, int32> items = 1;  // item_id (as string) -> quantity
 }
 
-// ========== Seller Operations ==========
+//Seller Operations
 message CreateSellerRequest {
   string username = 1;
   string password = 2;
@@ -58,7 +58,7 @@ message UpdateSellerFeedbackResponse {
   string error_message = 2;
 }
 
-// ========== Buyer Operations ==========
+//Buyer Operations
 message CreateBuyerRequest {
   string username = 1;
   string password = 2;
@@ -85,7 +85,7 @@ message BuyerLoginResponse {
   string error_message = 6;
 }
 
-// ========== Session Operations ==========
+//Session Operations
 message ValidateSellerSessionRequest {
   string session_id = 1;
 }
@@ -194,7 +194,7 @@ message ClearCartResponse {
   string error_message = 2;
 }
 
-// ========== Transaction/Purchase Operations ==========
+//Transaction/Purchase Operations
 
 message InsertTransactionRequest {
   int32 buyer_id = 1;
@@ -239,7 +239,7 @@ message GetBuyerPurchasesResponse {
   string error_message = 3;
 }
 
-// ========== Service Definition ==========
+//Service Definition 
 
 service CustomerDBService {
   // Seller operations

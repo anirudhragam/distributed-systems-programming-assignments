@@ -13,13 +13,13 @@ provider "google" {
   zone    = var.zone
 }
 
+# Shared locals
 
-# Docker install script
 
 locals {
   docker_install = <<-SCRIPT
     apt-get update -y
-    apt-get install -y ca-certificates curl gnupg git
+    apt-get install -y ca-certificates curl gnupg git netcat-openbsd
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
@@ -27,317 +27,70 @@ locals {
     apt-get update -y
     apt-get install -y docker-ce docker-ce-cli containerd.io
   SCRIPT
+
+
+  abp_peers_vm1 = "customer-db-0:5100,customer-db-1:5100,${google_compute_address.vm2_internal.address}:5100,${google_compute_address.vm3_internal.address}:5100,${google_compute_address.vm4_internal.address}:5100"
+  abp_peers_vm2 = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,customer-db-2:5100,${google_compute_address.vm3_internal.address}:5100,${google_compute_address.vm4_internal.address}:5100"
+  abp_peers_vm3 = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,${google_compute_address.vm2_internal.address}:5100,customer-db-3:5100,${google_compute_address.vm4_internal.address}:5100"
+  abp_peers_vm4 = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,${google_compute_address.vm2_internal.address}:5100,${google_compute_address.vm3_internal.address}:5100,customer-db-4:5100"
 }
 
-# ─────────────────────────────────────────────────────────
-# Product DB VM
-# ─────────────────────────────────────────────────────────
 
-resource "google_compute_instance" "product_db_vm" {
-  name         = "product-db-vm"
+resource "google_compute_address" "vm1_internal" {
+  name         = "vm1-internal"
+  region       = var.region
+  address_type = "INTERNAL"
+  subnetwork   = "default"
+  project      = var.project_id
+}
+
+resource "google_compute_address" "vm2_internal" {
+  name         = "vm2-internal"
+  region       = var.region
+  address_type = "INTERNAL"
+  subnetwork   = "default"
+  project      = var.project_id
+}
+
+resource "google_compute_address" "vm3_internal" {
+  name         = "vm3-internal"
+  region       = var.region
+  address_type = "INTERNAL"
+  subnetwork   = "default"
+  project      = var.project_id
+}
+
+resource "google_compute_address" "vm4_internal" {
+  name         = "vm4-internal"
+  region       = var.region
+  address_type = "INTERNAL"
+  subnetwork   = "default"
+  project      = var.project_id
+}
+
+
+# VM1 — product-db, customer-db-0, customer-db-1,
+#         financial-transactions, seller-server-0, buyer-server-0
+
+resource "google_compute_instance" "vm1" {
+  name         = "vm1"
   machine_type = var.machine_type
   zone         = var.zone
   project      = var.project_id
 
-  tags = ["product-db", "ecommerce"]
+  tags = ["customer-db", "product-db", "financial-transactions", "ecommerce-app", "ecommerce"]
 
   boot_disk {
     initialize_params {
       image = "debian-cloud/debian-12"
-      size  = 20
+      size  = 30
     }
   }
 
   network_interface {
     network    = "default"
     subnetwork = "default"
-    access_config {} # Ephemeral external IP needed for outbound internet (apt-get, git clone, docker pull)
-  }
-
-  metadata = {
-    ssh-keys = var.ssh_public_key
-  }
-
-  metadata_startup_script = <<-SCRIPT
-    #!/bin/bash
-    set -e
-    exec > /var/log/startup.log 2>&1
-
-    echo "=== [product-db-vm] Installing Docker ==="
-    ${local.docker_install}
-
-    echo "=== [product-db-vm] Cloning repo ==="
-    git clone ${var.repo_url} /opt/app
-
-    echo "=== [product-db-vm] Building image (build context: repo root) ==="
-    cd /opt/app
-    docker build -t product-db:latest -f services/product-db/Dockerfile .
-
-    echo "=== [product-db-vm] Starting container ==="
-    docker run -d \
-      --name product-db \
-      --restart unless-stopped \
-      -p 50051:50051 \
-      -e POSTGRES_DB=product_db \
-      -e POSTGRES_USER=product_user \
-      -e POSTGRES_PASSWORD=product_password \
-      -v product_db_data:/var/lib/postgresql/data \
-      product-db:latest
-
-    echo "=== [product-db-vm] Startup complete ==="
-  SCRIPT
-
-  service_account {
-    scopes = ["cloud-platform"]
-  }
-}
-
-
-# Customer DB VM
-
-resource "google_compute_instance" "customer_db_vm" {
-  name         = "customer-db-vm"
-  machine_type = var.machine_type
-  zone         = var.zone
-  project      = var.project_id
-
-  tags = ["customer-db", "ecommerce"]
-
-  boot_disk {
-    initialize_params {
-      image = "debian-cloud/debian-12"
-      size  = 20
-    }
-  }
-
-  network_interface {
-    network    = "default"
-    subnetwork = "default"
-    access_config {} # Ephemeral external IP needed for outbound internet (apt-get, git clone, docker pull)
-  }
-
-  metadata = {
-    ssh-keys = var.ssh_public_key
-  }
-
-  metadata_startup_script = <<-SCRIPT
-    #!/bin/bash
-    set -e
-    exec > /var/log/startup.log 2>&1
-
-    echo "=== [customer-db-vm] Installing Docker ==="
-    ${local.docker_install}
-
-    echo "=== [customer-db-vm] Cloning repo ==="
-    git clone ${var.repo_url} /opt/app
-
-    echo "=== [customer-db-vm] Building image (build context: repo root) ==="
-    cd /opt/app
-    docker build -t customer-db:latest -f services/customer-db/Dockerfile .
-
-    echo "=== [customer-db-vm] Starting container ==="
-    docker run -d \
-      --name customer-db \
-      --restart unless-stopped \
-      -p 50052:50052 \
-      -e POSTGRES_DB=customer_db \
-      -e POSTGRES_USER=customer_user \
-      -e POSTGRES_PASSWORD=customer_password \
-      -v customer_db_data:/var/lib/postgresql/data \
-      customer-db:latest
-
-    echo "=== [customer-db-vm] Startup complete ==="
-  SCRIPT
-
-  service_account {
-    scopes = ["cloud-platform"]
-  }
-}
-
-
-# Seller Server VM
-
-
-resource "google_compute_instance" "seller_server_vm" {
-  name         = "seller-server-vm"
-  machine_type = var.machine_type
-  zone         = var.zone
-  project      = var.project_id
-
-  depends_on = [
-    google_compute_instance.product_db_vm,
-    google_compute_instance.customer_db_vm,
-  ]
-
-  tags = ["seller-server", "ecommerce"]
-
-  boot_disk {
-    initialize_params {
-      image = "debian-cloud/debian-12"
-      size  = 15
-    }
-  }
-
-  network_interface {
-    network    = "default"
-    subnetwork = "default"
-    access_config {} # Ephemeral external IP for client access
-  }
-
-  metadata = {
-    ssh-keys = var.ssh_public_key
-  }
-
-  metadata_startup_script = <<-SCRIPT
-    #!/bin/bash
-    set -e
-    exec > /var/log/startup.log 2>&1
-
-    echo "=== [seller-server-vm] Installing Docker ==="
-    ${local.docker_install}
-
-    echo "=== [seller-server-vm] Cloning repo ==="
-    git clone ${var.repo_url} /opt/app
-
-    echo "=== [seller-server-vm] Building image (build context: repo root) ==="
-    cd /opt/app
-    docker build -t seller-server:latest -f services/seller_server/Dockerfile .
-
-    echo "=== [seller-server-vm] Starting container ==="
-    docker run -d \
-      --name seller-server \
-      --restart unless-stopped \
-      -p 5000:5000 \
-      -e SERVER_HOST=0.0.0.0 \
-      -e SERVER_PORT=5000 \
-      -e PRODUCT_DB_HOST="${google_compute_instance.product_db_vm.network_interface[0].network_ip}" \
-      -e PRODUCT_DB_PORT=50051 \
-      -e CUSTOMER_DB_HOST="${google_compute_instance.customer_db_vm.network_interface[0].network_ip}" \
-      -e CUSTOMER_DB_PORT=50052 \
-      seller-server:latest
-
-    echo "=== [seller-server-vm] Startup complete ==="
-  SCRIPT
-
-  service_account {
-    scopes = ["cloud-platform"]
-  }
-}
-
-
-# Buyer Server VM
-# financial-transactions (SOAP) runs on the same VM in a separate container.
-
-resource "google_compute_instance" "buyer_server_vm" {
-  name         = "buyer-server-vm"
-  machine_type = var.machine_type
-  zone         = var.zone
-  project      = var.project_id
-
-  depends_on = [
-    google_compute_instance.product_db_vm,
-    google_compute_instance.customer_db_vm,
-  ]
-
-  tags = ["buyer-server", "ecommerce"]
-
-  boot_disk {
-    initialize_params {
-      image = "debian-cloud/debian-12"
-      size  = 15
-    }
-  }
-
-  network_interface {
-    network    = "default"
-    subnetwork = "default"
-    access_config {} # Ephemeral external IP for client access
-  }
-
-  metadata = {
-    ssh-keys = var.ssh_public_key
-  }
-
-  metadata_startup_script = <<-SCRIPT
-    #!/bin/bash
-    set -e
-    exec > /var/log/startup.log 2>&1
-
-    echo "=== [buyer-server-vm] Installing Docker ==="
-    ${local.docker_install}
-
-    echo "=== [buyer-server-vm] Cloning repo ==="
-    git clone ${var.repo_url} /opt/app
-
-    # Create a Docker network so both containers can communicate by name
-    docker network create buyer-net
-
-    echo "=== [buyer-server-vm] Building financial-transactions image ==="
-    cd /opt/app
-    docker build -t financial-transactions:latest -f services/financial_transactions/Dockerfile services/financial_transactions/
-
-    echo "=== [buyer-server-vm] Starting financial-transactions ==="
-    docker run -d \
-      --name financial-transactions \
-      --network buyer-net \
-      --restart unless-stopped \
-      financial-transactions:latest
-
-    echo "=== [buyer-server-vm] Building buyer-server image (build context: repo root) ==="
-    docker build -t buyer-server:latest -f services/buyer_server/Dockerfile .
-
-    echo "=== [buyer-server-vm] Starting buyer-server ==="
-    docker run -d \
-      --name buyer-server \
-      --network buyer-net \
-      --restart unless-stopped \
-      -p 6000:6000 \
-      -e SERVER_HOST=0.0.0.0 \
-      -e SERVER_PORT=6000 \
-      -e PRODUCT_DB_HOST="${google_compute_instance.product_db_vm.network_interface[0].network_ip}" \
-      -e PRODUCT_DB_PORT=50051 \
-      -e CUSTOMER_DB_HOST="${google_compute_instance.customer_db_vm.network_interface[0].network_ip}" \
-      -e CUSTOMER_DB_PORT=50052 \
-      -e FINANCIAL_TRANSACTIONS_HOST=financial-transactions \
-      -e FINANCIAL_TRANSACTIONS_PORT=8000 \
-      buyer-server:latest
-
-    echo "=== [buyer-server-vm] Startup complete ==="
-  SCRIPT
-
-  service_account {
-    scopes = ["cloud-platform"]
-  }
-}
-
-
-# ─────────────────────────────────────────────────────────
-# Test Runner VM
-# ─────────────────────────────────────────────────────────
-
-resource "google_compute_instance" "test_runner_vm" {
-  name         = "test-runner-vm"
-  machine_type = var.machine_type
-  zone         = var.zone
-  project      = var.project_id
-
-  depends_on = [
-    google_compute_instance.seller_server_vm,
-    google_compute_instance.buyer_server_vm,
-  ]
-
-  tags = ["test-runner", "ecommerce"]
-
-  boot_disk {
-    initialize_params {
-      image = "debian-cloud/debian-12"
-      size  = 10
-    }
-  }
-
-  network_interface {
-    network    = "default"
-    subnetwork = "default"
+    network_ip = google_compute_address.vm1_internal.address
     access_config {}
   }
 
@@ -350,28 +103,392 @@ resource "google_compute_instance" "test_runner_vm" {
     set -e
     exec > /var/log/startup.log 2>&1
 
-    echo "=== [test-runner-vm] Installing Python and dependencies ==="
-    apt-get update -y
-    apt-get install -y python3 python3-pip git curl
+    echo "[vm1] Installing Docker "
+    ${local.docker_install}
 
-    echo "=== [test-runner-vm] Cloning repo ==="
+    echo " [vm1] Cloning repo "
     git clone ${var.repo_url} /opt/app
     cd /opt/app
 
-    pip3 install requests --break-system-packages
+    echo " [vm1] Building images "
+    docker build -t product-db:latest -f services/product-db/Dockerfile .
+    docker build -t customer-db:latest -f services/customer-db/Dockerfile .
+    docker build -t seller-server:latest -f services/seller_server/Dockerfile .
+    docker build -t buyer-server:latest -f services/buyer_server/Dockerfile .
+    docker build -t financial-transactions:latest \
+      -f services/financial_transactions/Dockerfile services/financial_transactions/
 
-    # Write server addresses to env file for easy sourcing
-    cat > /opt/app/.env <<'ENVEOF'
-export BUYER_SERVER="${google_compute_instance.buyer_server_vm.network_interface[0].access_config[0].nat_ip}"
-export BUYER_PORT=6000
-export SELLER_SERVER="${google_compute_instance.seller_server_vm.network_interface[0].access_config[0].nat_ip}"
-export SELLER_PORT=5000
-export PRODUCT_DB_IP="${google_compute_instance.product_db_vm.network_interface[0].network_ip}"
-export CUSTOMER_DB_IP="${google_compute_instance.customer_db_vm.network_interface[0].network_ip}"
-ENVEOF
+    echo " [vm1] Creating bridge network "
+    docker network create app-net
+
+    echo " [vm1] Starting product-db "
+    docker run -d --name product-db --network app-net --restart unless-stopped \
+      -p 50051:50051 \
+      -e POSTGRES_DB=product_db \
+      -e POSTGRES_USER=product_user \
+      -e POSTGRES_PASSWORD=product_password \
+      -v product_db_data:/var/lib/postgresql/data \
+      product-db:latest
+
+    echo " [vm1] Starting customer-db-0 (node 0, UDP 5100, gRPC 50052) "
+    docker run -d --name customer-db-0 --network app-net --restart unless-stopped \
+      -p 50052:50052 \
+      -p 5100:5100/udp \
+      -e POSTGRES_DB=customer_db \
+      -e POSTGRES_USER=customer_user \
+      -e POSTGRES_PASSWORD=customer_password \
+      -e ABP_NODE_ID=0 \
+      -e "ABP_PEERS=${local.abp_peers_vm1}" \
+      -e ABP_UDP_PORT=5100 \
+      -e GRPC_PORT=50052 \
+      -v customer_db_0_data:/var/lib/postgresql/data \
+      customer-db:latest
+
+    echo " [vm1] Starting customer-db-1 (node 1, UDP 5101, gRPC 50053) "
+    docker run -d --name customer-db-1 --network app-net --restart unless-stopped \
+      -p 50053:50052 \
+      -p 5101:5100/udp \
+      -e POSTGRES_DB=customer_db \
+      -e POSTGRES_USER=customer_user \
+      -e POSTGRES_PASSWORD=customer_password \
+      -e ABP_NODE_ID=1 \
+      -e "ABP_PEERS=${local.abp_peers_vm1}" \
+      -e ABP_UDP_PORT=5100 \
+      -e GRPC_PORT=50052 \
+      -v customer_db_1_data:/var/lib/postgresql/data \
+      customer-db:latest
+
+    echo " [vm1] Waiting for customer-db-0 "
+    until docker exec customer-db-0 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until nc -z localhost 50052; do sleep 2; done
+
+    echo " [vm1] Starting financial-transactions "
+    docker run -d --name financial-transactions --network app-net --restart unless-stopped \
+      -p 8000:8000 \
+      financial-transactions:latest
+
+    echo " [vm1] Starting seller-server-0 "
+    docker run -d --name seller-server-0 --network app-net --restart unless-stopped \
+      -p 5000:5000 \
+      -e SERVER_HOST=0.0.0.0 \
+      -e SERVER_PORT=5000 \
+      -e PRODUCT_DB_HOST=product-db \
+      -e PRODUCT_DB_PORT=50051 \
+      -e CUSTOMER_DB_HOST=customer-db-0 \
+      -e CUSTOMER_DB_PORT=50052 \
+      seller-server:latest
+
+    echo " [vm1] Starting buyer-server-0 "
+    docker run -d --name buyer-server-0 --network app-net --restart unless-stopped \
+      -p 6000:6000 \
+      -e SERVER_HOST=0.0.0.0 \
+      -e SERVER_PORT=6000 \
+      -e PRODUCT_DB_HOST=product-db \
+      -e PRODUCT_DB_PORT=50051 \
+      -e CUSTOMER_DB_HOST=customer-db-0 \
+      -e CUSTOMER_DB_PORT=50052 \
+      -e FINANCIAL_TRANSACTIONS_HOST=financial-transactions \
+      -e FINANCIAL_TRANSACTIONS_PORT=8000 \
+      buyer-server:latest
+
+    echo " [vm1] Startup complete "
   SCRIPT
 
   service_account {
     scopes = ["cloud-platform"]
   }
 }
+
+# VM2 — customer-db-2, seller-server-1, buyer-server-1
+resource "google_compute_instance" "vm2" {
+  name         = "vm2"
+  machine_type = var.machine_type
+  zone         = var.zone
+  project      = var.project_id
+
+  tags = ["customer-db", "ecommerce-app", "ecommerce"]
+
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-12"
+      size  = 20
+    }
+  }
+
+  network_interface {
+    network    = "default"
+    subnetwork = "default"
+    network_ip = google_compute_address.vm2_internal.address
+    access_config {}
+  }
+
+  metadata = {
+    ssh-keys = var.ssh_public_key
+  }
+
+  metadata_startup_script = <<-SCRIPT
+    #!/bin/bash
+    set -e
+    exec > /var/log/startup.log 2>&1
+
+    echo " [vm2] Installing Docker "
+    ${local.docker_install}
+
+    echo " [vm2] Cloning repo "
+    git clone ${var.repo_url} /opt/app
+    cd /opt/app
+
+    echo " [vm2] Building images "
+    docker build -t customer-db:latest -f services/customer-db/Dockerfile .
+    docker build -t seller-server:latest -f services/seller_server/Dockerfile .
+    docker build -t buyer-server:latest -f services/buyer_server/Dockerfile .
+
+    echo " [vm2] Creating bridge network "
+    docker network create app-net
+
+    echo " [vm2] Starting customer-db-2 (node 2, UDP 5100, gRPC 50052) "
+    docker run -d --name customer-db-2 --network app-net --restart unless-stopped \
+      -p 50052:50052 \
+      -p 5100:5100/udp \
+      -e POSTGRES_DB=customer_db \
+      -e POSTGRES_USER=customer_user \
+      -e POSTGRES_PASSWORD=customer_password \
+      -e ABP_NODE_ID=2 \
+      -e "ABP_PEERS=${local.abp_peers_vm2}" \
+      -e ABP_UDP_PORT=5100 \
+      -e GRPC_PORT=50052 \
+      -v customer_db_2_data:/var/lib/postgresql/data \
+      customer-db:latest
+
+    echo " [vm2] Waiting for customer-db-2 "
+    until docker exec customer-db-2 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until nc -z localhost 50052; do sleep 2; done
+
+    echo " [vm2] Starting seller-server-1 "
+    docker run -d --name seller-server-1 --network app-net --restart unless-stopped \
+      -p 5000:5000 \
+      -e SERVER_HOST=0.0.0.0 \
+      -e SERVER_PORT=5000 \
+      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
+      -e PRODUCT_DB_PORT=50051 \
+      -e CUSTOMER_DB_HOST=customer-db-2 \
+      -e CUSTOMER_DB_PORT=50052 \
+      seller-server:latest
+
+    echo " [vm2] Starting buyer-server-1 "
+    docker run -d --name buyer-server-1 --network app-net --restart unless-stopped \
+      -p 6000:6000 \
+      -e SERVER_HOST=0.0.0.0 \
+      -e SERVER_PORT=6000 \
+      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
+      -e PRODUCT_DB_PORT=50051 \
+      -e CUSTOMER_DB_HOST=customer-db-2 \
+      -e CUSTOMER_DB_PORT=50052 \
+      -e FINANCIAL_TRANSACTIONS_HOST=${google_compute_address.vm1_internal.address} \
+      -e FINANCIAL_TRANSACTIONS_PORT=8000 \
+      buyer-server:latest
+
+    echo " [vm2] Startup complete "
+  SCRIPT
+
+  service_account {
+    scopes = ["cloud-platform"]
+  }
+}
+
+
+# VM3 — customer-db-3, seller-server-2, buyer-server-2
+
+resource "google_compute_instance" "vm3" {
+  name         = "vm3"
+  machine_type = var.machine_type
+  zone         = var.zone
+  project      = var.project_id
+
+  tags = ["customer-db", "ecommerce-app", "ecommerce"]
+
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-12"
+      size  = 20
+    }
+  }
+
+  network_interface {
+    network    = "default"
+    subnetwork = "default"
+    network_ip = google_compute_address.vm3_internal.address
+    access_config {}
+  }
+
+  metadata = {
+    ssh-keys = var.ssh_public_key
+  }
+
+  metadata_startup_script = <<-SCRIPT
+    #!/bin/bash
+    set -e
+    exec > /var/log/startup.log 2>&1
+
+    echo " [vm3] Installing Docker "
+    ${local.docker_install}
+
+    echo " [vm3] Cloning repo "
+    git clone ${var.repo_url} /opt/app
+    cd /opt/app
+
+    echo " [vm3] Building images "
+    docker build -t customer-db:latest   -f services/customer-db/Dockerfile .
+    docker build -t seller-server:latest -f services/seller_server/Dockerfile .
+    docker build -t buyer-server:latest  -f services/buyer_server/Dockerfile .
+
+    echo " [vm3] Creating bridge network "
+    docker network create app-net
+
+    echo " [vm3] Starting customer-db-3 (node 3, UDP 5100, gRPC 50052) "
+    docker run -d --name customer-db-3 --network app-net --restart unless-stopped \
+      -p 50052:50052 \
+      -p 5100:5100/udp \
+      -e POSTGRES_DB=customer_db \
+      -e POSTGRES_USER=customer_user \
+      -e POSTGRES_PASSWORD=customer_password \
+      -e ABP_NODE_ID=3 \
+      -e "ABP_PEERS=${local.abp_peers_vm3}" \
+      -e ABP_UDP_PORT=5100 \
+      -e GRPC_PORT=50052 \
+      -v customer_db_3_data:/var/lib/postgresql/data \
+      customer-db:latest
+
+    echo "[vm3] Waiting for customer-db-3"
+    until docker exec customer-db-3 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until nc -z localhost 50052; do sleep 2; done
+
+    echo "[vm3] Starting seller-server-2"
+    docker run -d --name seller-server-2 --network app-net --restart unless-stopped \
+      -p 5000:5000 \
+      -e SERVER_HOST=0.0.0.0 \
+      -e SERVER_PORT=5000 \
+      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
+      -e PRODUCT_DB_PORT=50051 \
+      -e CUSTOMER_DB_HOST=customer-db-3 \
+      -e CUSTOMER_DB_PORT=50052 \
+      seller-server:latest
+
+    echo "[vm3] Starting buyer-server-2"
+    docker run -d --name buyer-server-2 --network app-net --restart unless-stopped \
+      -p 6000:6000 \
+      -e SERVER_HOST=0.0.0.0 \
+      -e SERVER_PORT=6000 \
+      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
+      -e PRODUCT_DB_PORT=50051 \
+      -e CUSTOMER_DB_HOST=customer-db-3 \
+      -e CUSTOMER_DB_PORT=50052 \
+      -e FINANCIAL_TRANSACTIONS_HOST=${google_compute_address.vm1_internal.address} \
+      -e FINANCIAL_TRANSACTIONS_PORT=8000 \
+      buyer-server:latest
+
+    echo "[vm3] Startup complete"
+  SCRIPT
+
+  service_account {
+    scopes = ["cloud-platform"]
+  }
+}
+
+# VM4 — customer-db-4, seller-server-3, buyer-server-3
+resource "google_compute_instance" "vm4" {
+  name         = "vm4"
+  machine_type = var.machine_type
+  zone         = var.zone
+  project      = var.project_id
+
+  tags = ["customer-db", "ecommerce-app", "ecommerce"]
+
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-12"
+      size  = 20
+    }
+  }
+
+  network_interface {
+    network    = "default"
+    subnetwork = "default"
+    network_ip = google_compute_address.vm4_internal.address
+    access_config {}
+  }
+
+  metadata = {
+    ssh-keys = var.ssh_public_key
+  }
+
+  metadata_startup_script = <<-SCRIPT
+    #!/bin/bash
+    set -e
+    exec > /var/log/startup.log 2>&1
+
+    echo "[vm4] Installing Docker"
+    ${local.docker_install}
+
+    echo "[vm4] Cloning repo"
+    git clone ${var.repo_url} /opt/app
+    cd /opt/app
+
+    echo "[vm4] Building images"
+    docker build -t customer-db:latest   -f services/customer-db/Dockerfile .
+    docker build -t seller-server:latest -f services/seller_server/Dockerfile .
+    docker build -t buyer-server:latest  -f services/buyer_server/Dockerfile .
+
+    echo "[vm4] Creating bridge network"
+    docker network create app-net
+
+    echo "[vm4] Starting customer-db-4 (node 4, UDP 5100, gRPC 50052)"
+    docker run -d --name customer-db-4 --network app-net --restart unless-stopped \
+      -p 50052:50052 \
+      -p 5100:5100/udp \
+      -e POSTGRES_DB=customer_db \
+      -e POSTGRES_USER=customer_user \
+      -e POSTGRES_PASSWORD=customer_password \
+      -e ABP_NODE_ID=4 \
+      -e "ABP_PEERS=${local.abp_peers_vm4}" \
+      -e ABP_UDP_PORT=5100 \
+      -e GRPC_PORT=50052 \
+      -v customer_db_4_data:/var/lib/postgresql/data \
+      customer-db:latest
+
+    echo "[vm4] Waiting for customer-db-4"
+    until docker exec customer-db-4 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until nc -z localhost 50052; do sleep 2; done
+
+    echo "[vm4] Starting seller-server-3"
+    docker run -d --name seller-server-3 --network app-net --restart unless-stopped \
+      -p 5000:5000 \
+      -e SERVER_HOST=0.0.0.0 \
+      -e SERVER_PORT=5000 \
+      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
+      -e PRODUCT_DB_PORT=50051 \
+      -e CUSTOMER_DB_HOST=customer-db-4 \
+      -e CUSTOMER_DB_PORT=50052 \
+      seller-server:latest
+
+    echo "[vm4] Starting buyer-server-3"
+    docker run -d --name buyer-server-3 --network app-net --restart unless-stopped \
+      -p 6000:6000 \
+      -e SERVER_HOST=0.0.0.0 \
+      -e SERVER_PORT=6000 \
+      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
+      -e PRODUCT_DB_PORT=50051 \
+      -e CUSTOMER_DB_HOST=customer-db-4 \
+      -e CUSTOMER_DB_PORT=50052 \
+      -e FINANCIAL_TRANSACTIONS_HOST=${google_compute_address.vm1_internal.address} \
+      -e FINANCIAL_TRANSACTIONS_PORT=8000 \
+      buyer-server:latest
+
+    echo "[vm4] Startup complete"
+  SCRIPT
+
+  service_account {
+    scopes = ["cloud-platform"]
+  }
+}
+
