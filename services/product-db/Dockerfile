@@ -8,12 +8,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages
-RUN pip3 install --break-system-packages grpcio grpcio-tools psycopg2-binary
+RUN pip3 install --break-system-packages grpcio grpcio-tools psycopg2-binary pysyncobj
 
 COPY services/product-db/init-schema.sql /docker-entrypoint-initdb.d/
 COPY services/product-db/grpc_server.py /app/
 COPY generated/ /app/generated/
 COPY services/product-db/startup.sh /app/
+RUN mkdir -p /data/raft && chmod 777 /data/raft
 
 RUN chmod +x /app/startup.sh
 

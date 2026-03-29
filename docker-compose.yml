@@ -1,10 +1,10 @@
 
 services:
-  product-db:
+  product-db-0:
     build:
       context: .
       dockerfile: ./services/product-db/Dockerfile
-    container_name: product_db_container
+    container_name: product_db_container_0
     ports:
       - "5432:5432"    # PostgreSQL port
       - "50051:50051"  # gRPC port
@@ -12,12 +12,116 @@ services:
       POSTGRES_DB: product_db
       POSTGRES_USER: product_user
       POSTGRES_PASSWORD: product_password
+      SELF_IP: product-db-0
+      PARTNERS: product-db-1,product-db-2,product-db-3,product-db-4
     volumes:
-      - product_db_data:/var/lib/postgresql/data
+      - product_db_data_0:/var/lib/postgresql/data
+      - product_db_raft_0:/data/raft
     networks:
       - distributed_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U product_user -d product_db && nc -z localhost 50051"]
+      start_period: 30s
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  product-db-1:
+    build:
+      context: .
+      dockerfile: ./services/product-db/Dockerfile
+    container_name: product_db_container_1
+    ports:
+      - "5433:5432"    # PostgreSQL port
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_password
+      SELF_IP: product-db-1
+      PARTNERS: product-db-0,product-db-2,product-db-3,product-db-4
+    volumes:
+      - product_db_data_1:/var/lib/postgresql/data
+      - product_db_raft_1:/data/raft
+    networks:
+      - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db && nc -z localhost 50051"]
+      start_period: 30s
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  product-db-2:
+    build:
+      context: .
+      dockerfile: ./services/product-db/Dockerfile
+    container_name: product_db_container_2
+    ports:
+      - "5434:5432"    # PostgreSQL port
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_password
+      SELF_IP: product-db-2
+      PARTNERS: product-db-0,product-db-1,product-db-3,product-db-4
+    volumes:
+      - product_db_data_2:/var/lib/postgresql/data
+      - product_db_raft_2:/data/raft
+    networks:
+      - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db && nc -z localhost 50051"]
+      start_period: 30s
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  product-db-3:
+    build:
+      context: .
+      dockerfile: ./services/product-db/Dockerfile
+    container_name: product_db_container_3
+    ports:
+      - "5435:5432"    # PostgreSQL port
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_password
+      SELF_IP: product-db-3
+      PARTNERS: product-db-0,product-db-1,product-db-2,product-db-4
+    volumes:
+      - product_db_data_3:/var/lib/postgresql/data
+      - product_db_raft_3:/data/raft
+    networks:
+      - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db && nc -z localhost 50051"]
+      start_period: 30s
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      
+  product-db-4:
+    build:
+      context: .
+      dockerfile: ./services/product-db/Dockerfile
+    container_name: product_db_container_4
+    ports:
+      - "5436:5432"    # PostgreSQL port
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_password
+      SELF_IP: product-db-4
+      PARTNERS: product-db-0,product-db-1,product-db-2,product-db-3
+    volumes:
+      - product_db_data_4:/var/lib/postgresql/data
+      - product_db_raft_4:/data/raft
+    networks:
+      - distributed_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db && nc -z localhost 50051"]
+      start_period: 30s
       interval: 5s
       timeout: 5s
       retries: 5
@@ -46,6 +150,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
   customer-db-1:
     build:
       context: .
@@ -70,6 +175,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
   customer-db-2:
     build:
       context: .
@@ -165,7 +271,15 @@ services:
       dockerfile: ./services/seller_server/Dockerfile
     container_name: seller_server_container_0
     depends_on:
-      product-db:
+      product-db-0:
+        condition: service_healthy
+      product-db-1:
+        condition: service_healthy
+      product-db-2:
+        condition: service_healthy
+      product-db-3:
+        condition: service_healthy
+      product-db-4:
         condition: service_healthy
       customer-db-0:
         condition: service_healthy
@@ -195,7 +309,15 @@ services:
       dockerfile: ./services/seller_server/Dockerfile
     container_name: seller_server_container_1
     depends_on:
-      product-db:
+      product-db-0:
+        condition: service_healthy
+      product-db-1:
+        condition: service_healthy
+      product-db-2:
+        condition: service_healthy
+      product-db-3:
+        condition: service_healthy
+      product-db-4:
         condition: service_healthy
       customer-db-0:
         condition: service_healthy
@@ -225,7 +347,15 @@ services:
       dockerfile: ./services/seller_server/Dockerfile
     container_name: seller_server_container_2
     depends_on:
-      product-db:
+      product-db-0:
+        condition: service_healthy
+      product-db-1:
+        condition: service_healthy
+      product-db-2:
+        condition: service_healthy
+      product-db-3:
+        condition: service_healthy
+      product-db-4:
         condition: service_healthy
       customer-db-0:
         condition: service_healthy
@@ -255,7 +385,15 @@ services:
       dockerfile: ./services/seller_server/Dockerfile
     container_name: seller_server_container_3
     depends_on:
-      product-db:
+      product-db-0:
+        condition: service_healthy
+      product-db-1:
+        condition: service_healthy
+      product-db-2:
+        condition: service_healthy
+      product-db-3:
+        condition: service_healthy
+      product-db-4:
         condition: service_healthy
       customer-db-0:
         condition: service_healthy
@@ -299,7 +437,15 @@ services:
       dockerfile: ./services/buyer_server/Dockerfile
     container_name: buyer_server_container_0
     depends_on:
-      product-db:
+      product-db-0:
+        condition: service_healthy
+      product-db-1:
+        condition: service_healthy
+      product-db-2:
+        condition: service_healthy
+      product-db-3:
+        condition: service_healthy
+      product-db-4:
         condition: service_healthy
       customer-db-0:
         condition: service_healthy
@@ -331,7 +477,15 @@ services:
       dockerfile: ./services/buyer_server/Dockerfile
     container_name: buyer_server_container_1
     depends_on:
-      product-db:
+      product-db-0:
+        condition: service_healthy
+      product-db-1:
+        condition: service_healthy
+      product-db-2:
+        condition: service_healthy
+      product-db-3:
+        condition: service_healthy
+      product-db-4:
         condition: service_healthy
       customer-db-0:
         condition: service_healthy
@@ -364,7 +518,15 @@ services:
       dockerfile: ./services/buyer_server/Dockerfile
     container_name: buyer_server_container_2
     depends_on:
-      product-db:
+      product-db-0:
+        condition: service_healthy
+      product-db-1:
+        condition: service_healthy
+      product-db-2:
+        condition: service_healthy
+      product-db-3:
+        condition: service_healthy
+      product-db-4:
         condition: service_healthy
       customer-db-0:
         condition: service_healthy
@@ -396,7 +558,15 @@ services:
       dockerfile: ./services/buyer_server/Dockerfile
     container_name: buyer_server_container_3
     depends_on:
-      product-db:
+      product-db-0:
+        condition: service_healthy
+      product-db-1:
+        condition: service_healthy
+      product-db-2:
+        condition: service_healthy
+      product-db-3:
+        condition: service_healthy
+      product-db-4:
         condition: service_healthy
       customer-db-0:
         condition: service_healthy
@@ -439,7 +609,16 @@ services:
       start_period: 10s
 
 volumes:
-  product_db_data:
+  product_db_data_0:
+  product_db_data_1:
+  product_db_data_2:
+  product_db_data_3:
+  product_db_data_4:
+  product_db_raft_0:
+  product_db_raft_1:
+  product_db_raft_2:
+  product_db_raft_3:
+  product_db_raft_4:
   customer_db_0_data:
   customer_db_1_data:
   customer_db_2_data:

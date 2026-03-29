@@ -21,7 +21,7 @@ resource "google_compute_firewall" "allow_product_db_grpc" {
 
   allow {
     protocol = "tcp"
-    ports    = ["50051"]
+    ports    = ["50051", "12345"]
   }
 
   source_ranges = ["10.128.0.0/9"]

@@ -18,6 +18,7 @@ import product_db_pb2
 import product_db_pb2_grpc
 import requests
 from zeep import Client
+import random
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -28,30 +29,67 @@ product_db_stub = None
 customer_db_channel = None
 customer_db_stub = None
 soap_client = None
+product_db_hosts = None
+product_db_port = None
 
 _ft_host = os.getenv("FINANCIAL_TRANSACTIONS_HOST", "financial-transactions")
 _ft_port = os.getenv("FINANCIAL_TRANSACTIONS_PORT", "8000")
 SOAP_WSDL = f"http://{_ft_host}:{_ft_port}/?wsdl"
 SOAP_ENDPOINT = f"http://{_ft_host}:{_ft_port}/"
 
+def get_product_db_stub():
+    """
+    Tries to connect to ANY available node in the cluster.
+    """
+    # Randomize the list so we don't all dogpile on Node 0
+    random.shuffle(product_db_hosts)
+    
+    for host in product_db_hosts:
+        try:
+            channel = grpc.insecure_channel(f"{host}:{product_db_port}")
+            # Short timeout (2s) to see if the VM is even alive
+            grpc.channel_ready_future(channel).result(timeout=2)
+            return product_db_pb2_grpc.ProductDBServiceStub(channel)
+        except (grpc.FutureTimeoutError, grpc.RpcError):
+            print(f"Node {host} is down/starting, trying next...")
+            continue
+            
+    return None # All nodes are down
+
+def call_with_failover(method_name, request):
+    """Try up to 3 different nodes if one is down"""
+    for _ in range(3):
+        stub = get_product_db_stub()
+        if not stub:
+            continue
+        try:
+            # Set a timeout so we don't wait forever on a crashed node
+            return getattr(stub, method_name)(request, timeout=5)
+        except grpc.RpcError as e:
+            print(f"Connection to node failed, retrying another... {e.code()}")
+            continue
+    raise Exception("All attempted gRPC nodes are unavailable.")
+
 def init_grpc_clients():
     """Initialize gRPC client stubs for database services"""
-    global product_db_channel, product_db_stub, customer_db_channel, customer_db_stub, soap_client
+    global product_db_channel, product_db_stub, customer_db_channel, customer_db_stub, soap_client, product_db_hosts, product_db_port
 
-    product_db_host = os.getenv("PRODUCT_DB_HOST", "product-db")
+    hosts_string = os.getenv("PRODUCT_DB_HOSTS", "product-db-0,product-db-1,product-db-2,product-db-3,product-db-4")
+    product_db_hosts = [h.strip() for h in hosts_string.split(",") if h.strip()]
+    
     product_db_port = os.getenv("PRODUCT_DB_PORT", "50051")
     customer_db_host = os.getenv("CUSTOMER_DB_HOST", "customer-db-0")
     customer_db_port = os.getenv("CUSTOMER_DB_PORT", "50052")
 
     for attempt in range(30):
         try:
-            product_db_channel = grpc.insecure_channel(f'{product_db_host}:{product_db_port}')
+            product_db_channel = grpc.insecure_channel(f'{product_db_hosts[0]}:{product_db_port}')
             product_db_stub = product_db_pb2_grpc.ProductDBServiceStub(product_db_channel)
             grpc.channel_ready_future(product_db_channel).result(timeout=5)
-            print(f"Connected to product-db at {product_db_host}:{product_db_port}")
+            print(f"Connected to product-db at {product_db_hosts[0]}:{product_db_port}")
             break
         except grpc.FutureTimeoutError:
-            print(f"Waiting for product-db at {product_db_host}:{product_db_port} (attempt {attempt+1}/30)...")
+            print(f"Waiting for product-db at {product_db_hosts[0]}:{product_db_port} (attempt {attempt+1}/30)...")
             time.sleep(10)
 
     for attempt in range(30):
@@ -555,7 +593,7 @@ def make_purchase(session_id, buyer_id):
             # Maybe better to have a bulk update quantity gRPC?
             # update products quantities
             for request_msg in update_quantity_request_msgs:
-                response = product_db_stub.UpdateItemQuantity(request_msg)
+                response = call_with_failover("UpdateItemQuantity", request_msg)
 
                 if not response.success:
                     return jsonify({
@@ -638,7 +676,7 @@ def provide_feedback(session_id, buyer_id):
             item_id=item_id,
             thumbs_up=(feedback == 1)
         )
-        item_feedback_resp = product_db_stub.UpdateItemFeedback(item_feedback_req)
+        item_feedback_resp = call_with_failover("UpdateItemFeedback", item_feedback_req)
 
         if not item_feedback_resp.success:
             return jsonify({
@@ -670,6 +708,12 @@ def provide_feedback(session_id, buyer_id):
             "status": "Error",
             "message": "Failed to provide feedback."
         }), 500
+    except Exception as e:
+        print(f"Product DB cluster unavailable: {e}")
+        return jsonify({
+            "status": "Error",
+            "message": "Product database cluster is temporarily unavailable."
+        }), 503
 
 
 @app.route('/api/buyers/sellers/<int:seller_id>/rating', methods=['GET'])
