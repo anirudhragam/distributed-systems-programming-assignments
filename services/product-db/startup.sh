@@ -20,4 +20,4 @@ start_grpc_server &
 GRPC_PID=$!
 
 # Start PostgreSQL in foreground (this is the main process)
-exec docker-entrypoint.sh postgres
+exec docker-entrypoint.sh postgres -c synchronous_commit=off

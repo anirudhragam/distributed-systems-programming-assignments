@@ -51,7 +51,7 @@ class RaftManager(SyncObj):
         # Create a config that cleans the log every 500 entries
         conf = SyncObjConf(
             entriesFinishedSize=500, 
-            autoTickPeriod=0.05,
+            autoTickPeriod=0.01,
         )
         super(RaftManager, self).__init__(self_addr, partners, conf=conf)
         print("Initializing Product DB gRPC server...") 
