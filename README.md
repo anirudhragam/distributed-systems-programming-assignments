@@ -415,24 +415,30 @@ curl -s -X GET http://$BUYER:6000/api/buyers/purchases \
   -H "Authorization: Bearer $BUYER_SESSION" | python3 -m json.tool
 ```
 
+Create ~/restart_services.sh on the test runner VM:
+```
+cat > ~/restart_services.sh <<'EOF'
+#!/bin/bash
+for vm in vm1 vm2 vm3 vm4; do
+  gcloud compute ssh $vm --zone=$ZONE --command="sudo docker ps --format '{{.Names}}' | grep -E 'customer-db|seller-server|buyer-server' | xargs sudo docker restart" -- -o StrictHostKeyChecking=no
+done
+sleep 15
+bash /opt/app/reset_dbs.sh
+EOF
+chmod +x ~/restart_services.sh
+```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Create ~/restart_services_except_vm2.sh for Failure Condition B (keeps VM2 app servers stopped):
+```
+cat > ~/restart_services_except_vm2.sh <<'EOF'
+#!/bin/bash
+for vm in vm1 vm3 vm4; do
+  gcloud compute ssh $vm --zone=$ZONE --command="sudo docker ps --format '{{.Names}}' | grep -E 'customer-db|seller-server|buyer-server' | xargs sudo docker restart" -- -o StrictHostKeyChecking=no
+done
+# Restart only customer-db on VM2, not the app servers
+gcloud compute ssh vm2 --zone=$ZONE --command="sudo docker ps --format '{{.Names}}' | grep 'customer-db' | xargs sudo docker restart" -- -o StrictHostKeyChecking=no
+sleep 15
+bash /opt/app/reset_dbs.sh
+EOF
+chmod +x ~/restart_services_except_vm2.sh
+```
