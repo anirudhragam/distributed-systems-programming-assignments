@@ -13,7 +13,7 @@ class SellerAPIClient:
     """Client for making REST API calls to the seller backend server"""
 
     def __init__(self, server_host: str = "seller_server", server_port: int = 5000):
-        addrs = os.getenv("SERVER_ADDRS", "seller-server:5000")
+        addrs = os.getenv("SERVER_ADDRS", f"{server_host}:{server_port}")
         self.servers = [(h, int(p)) for h,p in
                         (a.split(":") for a in addrs.split(","))]
         self.base_url = f"http://{server_host}:{server_port}/api"

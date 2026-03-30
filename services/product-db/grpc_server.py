@@ -489,11 +489,12 @@ class ProductDBServicer(product_db_pb2_grpc.ProductDBServiceServicer):
 def serve():
     """Start the gRPC server"""
     self_ip = os.getenv("SELF_IP", "")
+    self_port = os.getenv("SELF_PORT", "12345")
     raw_partners = os.getenv("PARTNERS", "")
     # Split the string and ensure each IP has the :12345 port attached
     partners = [f"{ip.strip()}:12345" if ":" not in ip else ip.strip() for ip in raw_partners.split(",") if ip.strip()]
     # Initialize Raft Manager
-    raft_manager = RaftManager(f"{self_ip}:12345", partners)
+    raft_manager = RaftManager(f"{self_ip}:{self_port}", partners)
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=100))
     product_db_pb2_grpc.add_ProductDBServiceServicer_to_server(

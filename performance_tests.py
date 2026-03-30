@@ -16,10 +16,14 @@ BUYER_PORT = int(os.getenv("BUYER_PORT", "6000"))
 SELLER_SERVER = os.getenv("SELLER_SERVER", "34.182.100.10")
 SELLER_SERVER_PORT = int(os.getenv("SELLER_PORT", "5000"))
 
+BUYER_SERVERS = [s.strip() for s in os.getenv("BUYER_SERVERS", BUYER_SERVER).split(",")]
+SELLER_SERVERS = [s.strip() for s in os.getenv("SELLER_SERVERS", SELLER_SERVER).split(",")]
+
 def run_seller_operations(seller_id: int):
     response_times = []
     try:
-        client = SellerAPIClient(SELLER_SERVER, SELLER_SERVER_PORT)
+        server_ip = SELLER_SERVERS[seller_id % len(SELLER_SERVERS)]
+        client = SellerAPIClient(server_ip, SELLER_SERVER_PORT)
 
         # Create unique credentials
         username = f"seller_{seller_id}_{int(time.time() * 1000)}"
@@ -96,7 +100,8 @@ def run_seller_operations(seller_id: int):
 def run_buyer_operations(buyer_id: int):
     response_times = []
     try:
-        client = BuyerAPIClient(BUYER_SERVER, BUYER_PORT)
+        server_ip = BUYER_SERVERS[buyer_id % len(BUYER_SERVERS)]
+        client = BuyerAPIClient(server_ip, BUYER_PORT)
 
         # Create unique credentials
         username = f"buyer_{buyer_id}_{int(time.time() * 1000)}"

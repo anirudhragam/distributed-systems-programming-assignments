@@ -37,7 +37,7 @@ def get_product_db_stub():
     
     for host in product_db_hosts:
         try:
-            channel = grpc.insecure_channel(f"{host}:{product_db_port}")
+            channel = grpc.insecure_channel(host if ":" in host else f"{host}:{product_db_port}")
             # Short timeout (2s) to see if the VM is even alive
             grpc.channel_ready_future(channel).result(timeout=2)
             return product_db_pb2_grpc.ProductDBServiceStub(channel)
@@ -74,7 +74,7 @@ def init_grpc_clients():
 
     for attempt in range(30):
         try:
-            product_db_channel = grpc.insecure_channel(f'{product_db_hosts[0]}:{product_db_port}')
+            product_db_channel = grpc.insecure_channel(product_db_hosts[0] if ":" in product_db_hosts[0] else f"{product_db_hosts[0]}:{product_db_port}")
             product_db_stub = product_db_pb2_grpc.ProductDBServiceStub(product_db_channel)
             grpc.channel_ready_future(product_db_channel).result(timeout=5)
             print(f"Connected to product-db at {product_db_hosts[0]}:{product_db_port}")

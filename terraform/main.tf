@@ -33,80 +33,13 @@ locals {
   abp_peers_vm2 = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,customer-db-2:5100,${google_compute_address.vm3_internal.address}:5100,${google_compute_address.vm4_internal.address}:5100"
   abp_peers_vm3 = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,${google_compute_address.vm2_internal.address}:5100,customer-db-3:5100,${google_compute_address.vm4_internal.address}:5100"
   abp_peers_vm4 = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,${google_compute_address.vm2_internal.address}:5100,${google_compute_address.vm3_internal.address}:5100,customer-db-4:5100"
-}
 
-# 1. Create 5 Static Internal IPs first
-resource "google_compute_address" "internal_ip" {
-  count        = 5
-  name         = "product-db-node-ip-${count.index}"
-  subnetwork   = "default"
-  address_type = "INTERNAL"
-  region       = var.region
-}
-
-# Create 5 product db VMs
-resource "google_compute_instance" "product_db_node" {
-  count        = 5
-  name         = "product-db-node-${count.index}"
-  machine_type = var.machine_type
-  zone         = var.zone
-  project      = var.project_id
-
-  tags = ["product-db", "ecommerce"]
-
-  boot_disk {
-    initialize_params {
-      image = "debian-cloud/debian-12"
-      size  = 20
-    }
-  }
-
-  network_interface {
-    network    = "default"
-    subnetwork = "default"
-    network_ip = google_compute_address.internal_ip[count.index].address
-    access_config {} # Ephemeral external IP needed for outbound internet (apt-get, git clone, docker pull)
-  }
-
-  metadata = {
-    ssh-keys = var.ssh_public_key
-  }
-
-  metadata_startup_script = <<-SCRIPT
-    #!/bin/bash
-    set -e
-    exec > /var/log/startup.log 2>&1
-
-    echo "=== [product-db-vm] Installing Docker ==="
-    ${local.docker_install}
-
-    echo "=== [product-db-vm] Cloning repo ==="
-    git clone ${var.repo_url} /opt/app
-
-    echo "=== [product-db-vm] Building image (build context: repo root) ==="
-    cd /opt/app
-    docker build -t product-db:latest -f services/product-db/Dockerfile .
-
-    echo "=== [product-db-vm] Starting container ==="
-    docker run -d \
-      --name product-db \
-      --restart unless-stopped \
-      -p 50051:50051 \
-      -e POSTGRES_DB=product_db \
-      -e POSTGRES_USER=product_user \
-      -e POSTGRES_PASSWORD=product_password \
-      -e SELF_IP="${google_compute_address.internal_ip[count.index].address}" \
-      -e PARTNERS="${join(",", [for i in range(5) : google_compute_address.internal_ip[i].address if i != count.index])}" \
-      -v product_db_data:/var/lib/postgresql/data \
-      -v product_db_raft:/data/raft \
-      product-db:latest
-
-    echo "=== [product-db-vm] Startup complete ==="
-  SCRIPT
-
-  service_account {
-    scopes = ["cloud-platform"]
-  }
+  raft_partners_db_0 = "${google_compute_address.vm1_internal.address}:12346,${google_compute_address.vm2_internal.address}:12345,${google_compute_address.vm3_internal.address}:12345,${google_compute_address.vm4_internal.address}:12345"
+  raft_partners_db_1 = "${google_compute_address.vm1_internal.address}:12345,${google_compute_address.vm2_internal.address}:12345,${google_compute_address.vm3_internal.address}:12345,${google_compute_address.vm4_internal.address}:12345"
+  raft_partners_db_2 = "${google_compute_address.vm1_internal.address}:12345,${google_compute_address.vm1_internal.address}:12346,${google_compute_address.vm3_internal.address}:12345,${google_compute_address.vm4_internal.address}:12345"
+  raft_partners_db_3 = "${google_compute_address.vm1_internal.address}:12345,${google_compute_address.vm1_internal.address}:12346,${google_compute_address.vm2_internal.address}:12345,${google_compute_address.vm4_internal.address}:12345"
+  raft_partners_db_4 = "${google_compute_address.vm1_internal.address}:12345,${google_compute_address.vm1_internal.address}:12346,${google_compute_address.vm2_internal.address}:12345,${google_compute_address.vm3_internal.address}:12345"
+  product_db_hosts   = "${google_compute_address.vm1_internal.address}:50051,${google_compute_address.vm1_internal.address}:50054,${google_compute_address.vm2_internal.address}:50051,${google_compute_address.vm3_internal.address}:50051,${google_compute_address.vm4_internal.address}:50051"
 }
 
 resource "google_compute_address" "vm1_internal" {
@@ -194,13 +127,30 @@ resource "google_compute_instance" "vm1" {
     echo " [vm1] Creating bridge network "
     docker network create app-net
 
-    echo " [vm1] Starting product-db "
-    docker run -d --name product-db --network app-net --restart unless-stopped \
+    echo " [vm1] Starting product-db-0 (node 0, gRPC 50051, Raft 12345) "
+    # product-db-0: gRPC 50051, Raft 12345
+    docker run -d --name product-db-0 --network app-net --restart unless-stopped \
       -p 50051:50051 \
-      -e POSTGRES_DB=product_db \
-      -e POSTGRES_USER=product_user \
-      -e POSTGRES_PASSWORD=product_password \
-      -v product_db_data:/var/lib/postgresql/data \
+      -p 12345:12345 \
+      -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
+      -e SELF_IP="${google_compute_address.vm1_internal.address}" \
+      -e SELF_PORT=12345 \
+      -e PARTNERS="${local.raft_partners_db_0}" \
+      -v product_db_0_data:/var/lib/postgresql/data \
+      -v product_db_0_raft:/data/raft \
+      product-db:latest
+
+    echo " [vm1] Starting product-db-1 (node 1, gRPC 50054, Raft 12346) "
+    # product-db-1: gRPC exposed on 50054, Raft exposed on 12346
+    docker run -d --name product-db-1 --network app-net --restart unless-stopped \
+      -p 50054:50051 \
+      -p 12346:12345 \
+      -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
+      -e SELF_IP="${google_compute_address.vm1_internal.address}" \
+      -e SELF_PORT=12346 \
+      -e PARTNERS="${local.raft_partners_db_1}" \
+      -v product_db_1_data:/var/lib/postgresql/data \
+      -v product_db_1_raft:/data/raft \
       product-db:latest
 
     echo " [vm1] Starting customer-db-0 (node 0, UDP 5100, gRPC 50052) "
@@ -245,8 +195,7 @@ resource "google_compute_instance" "vm1" {
       -p 5000:5000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=5000 \
-      -e PRODUCT_DB_HOST=product-db \
-      -e PRODUCT_DB_PORT=50051 \
+      -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
       -e CUSTOMER_DB_HOST=customer-db-0 \
       -e CUSTOMER_DB_PORT=50052 \
       seller-server:latest
@@ -256,8 +205,7 @@ resource "google_compute_instance" "vm1" {
       -p 6000:6000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
-      -e PRODUCT_DB_HOST=product-db \
-      -e PRODUCT_DB_PORT=50051 \
+      -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
       -e CUSTOMER_DB_HOST=customer-db-0 \
       -e CUSTOMER_DB_PORT=50052 \
       -e FINANCIAL_TRANSACTIONS_HOST=financial-transactions \
@@ -312,12 +260,26 @@ resource "google_compute_instance" "vm2" {
     cd /opt/app
 
     echo " [vm2] Building images "
+    docker build -t product-db:latest -f services/product-db/Dockerfile .
     docker build -t customer-db:latest -f services/customer-db/Dockerfile .
     docker build -t seller-server:latest -f services/seller_server/Dockerfile .
     docker build -t buyer-server:latest -f services/buyer_server/Dockerfile .
 
     echo " [vm2] Creating bridge network "
     docker network create app-net
+
+    # VM2: product-db-2
+    echo " [vm2] Starting product-db-2 (node 2, gRPC 50051, Raft 12345) "
+    docker run -d --name product-db-2 --network app-net --restart unless-stopped \
+      -p 50051:50051 \
+      -p 12345:12345 \
+      -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
+      -e SELF_IP="${google_compute_address.vm2_internal.address}" \
+      -e SELF_PORT=12345 \
+      -e PARTNERS="${local.raft_partners_db_2}" \
+      -v product_db_2_data:/var/lib/postgresql/data \
+      -v product_db_2_raft:/data/raft \
+      product-db:latest
 
     echo " [vm2] Starting customer-db-2 (node 2, UDP 5100, gRPC 50052) "
     docker run -d --name customer-db-2 --network app-net --restart unless-stopped \
@@ -342,8 +304,7 @@ resource "google_compute_instance" "vm2" {
       -p 5000:5000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=5000 \
-      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
-      -e PRODUCT_DB_PORT=50051 \
+      -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
       -e CUSTOMER_DB_HOST=customer-db-2 \
       -e CUSTOMER_DB_PORT=50052 \
       seller-server:latest
@@ -353,8 +314,7 @@ resource "google_compute_instance" "vm2" {
       -p 6000:6000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
-      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
-      -e PRODUCT_DB_PORT=50051 \
+      -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
       -e CUSTOMER_DB_HOST=customer-db-2 \
       -e CUSTOMER_DB_PORT=50052 \
       -e FINANCIAL_TRANSACTIONS_HOST=${google_compute_address.vm1_internal.address} \
@@ -411,12 +371,26 @@ resource "google_compute_instance" "vm3" {
     cd /opt/app
 
     echo " [vm3] Building images "
+    docker build -t product-db:latest -f services/product-db/Dockerfile .
     docker build -t customer-db:latest   -f services/customer-db/Dockerfile .
     docker build -t seller-server:latest -f services/seller_server/Dockerfile .
     docker build -t buyer-server:latest  -f services/buyer_server/Dockerfile .
 
     echo " [vm3] Creating bridge network "
     docker network create app-net
+
+    # VM3: product-db-3
+    echo " [vm3] Starting product-db-3 (node 2, gRPC 50051, Raft 12345) "
+    docker run -d --name product-db-3 --network app-net --restart unless-stopped \
+      -p 50051:50051 \
+      -p 12345:12345 \
+      -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
+      -e SELF_IP="${google_compute_address.vm3_internal.address}" \
+      -e SELF_PORT=12345 \
+      -e PARTNERS="${local.raft_partners_db_3}" \
+      -v product_db_3_data:/var/lib/postgresql/data \
+      -v product_db_3_raft:/data/raft \
+      product-db:latest
 
     echo " [vm3] Starting customer-db-3 (node 3, UDP 5100, gRPC 50052) "
     docker run -d --name customer-db-3 --network app-net --restart unless-stopped \
@@ -441,8 +415,7 @@ resource "google_compute_instance" "vm3" {
       -p 5000:5000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=5000 \
-      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
-      -e PRODUCT_DB_PORT=50051 \
+      -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
       -e CUSTOMER_DB_HOST=customer-db-3 \
       -e CUSTOMER_DB_PORT=50052 \
       seller-server:latest
@@ -452,8 +425,7 @@ resource "google_compute_instance" "vm3" {
       -p 6000:6000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
-      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
-      -e PRODUCT_DB_PORT=50051 \
+      -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
       -e CUSTOMER_DB_HOST=customer-db-3 \
       -e CUSTOMER_DB_PORT=50052 \
       -e FINANCIAL_TRANSACTIONS_HOST=${google_compute_address.vm1_internal.address} \
@@ -508,12 +480,26 @@ resource "google_compute_instance" "vm4" {
     cd /opt/app
 
     echo "[vm4] Building images"
+    docker build -t product-db:latest -f services/product-db/Dockerfile .
     docker build -t customer-db:latest   -f services/customer-db/Dockerfile .
     docker build -t seller-server:latest -f services/seller_server/Dockerfile .
     docker build -t buyer-server:latest  -f services/buyer_server/Dockerfile .
 
     echo "[vm4] Creating bridge network"
     docker network create app-net
+
+    # VM4: product-db-4
+    echo " [vm4] Starting product-db-4 (node 2, gRPC 50051, Raft 12345) "
+    docker run -d --name product-db-4 --network app-net --restart unless-stopped \
+      -p 50051:50051 \
+      -p 12345:12345 \
+      -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
+      -e SELF_IP="${google_compute_address.vm4_internal.address}" \
+      -e SELF_PORT=12345 \
+      -e PARTNERS="${local.raft_partners_db_4}" \
+      -v product_db_4_data:/var/lib/postgresql/data \
+      -v product_db_4_raft:/data/raft \
+      product-db:latest
 
     echo "[vm4] Starting customer-db-4 (node 4, UDP 5100, gRPC 50052)"
     docker run -d --name customer-db-4 --network app-net --restart unless-stopped \
@@ -538,8 +524,7 @@ resource "google_compute_instance" "vm4" {
       -p 5000:5000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=5000 \
-      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
-      -e PRODUCT_DB_PORT=50051 \
+      -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
       -e CUSTOMER_DB_HOST=customer-db-4 \
       -e CUSTOMER_DB_PORT=50052 \
       seller-server:latest
@@ -549,8 +534,7 @@ resource "google_compute_instance" "vm4" {
       -p 6000:6000 \
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
-      -e PRODUCT_DB_HOST=${google_compute_address.vm1_internal.address} \
-      -e PRODUCT_DB_PORT=50051 \
+      -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
       -e CUSTOMER_DB_HOST=customer-db-4 \
       -e CUSTOMER_DB_PORT=50052 \
       -e FINANCIAL_TRANSACTIONS_HOST=${google_compute_address.vm1_internal.address} \
@@ -608,7 +592,7 @@ resource "google_compute_instance" "test_runner_vm" {
 
     echo "=== [test-runner-vm] Installing Python and dependencies ==="
     apt-get update -y
-    apt-get install -y python3 python3-pip git curl
+    apt-get install -y python3 python3-pip git curl google-cloud-cli
 
     echo "=== [test-runner-vm] Cloning repo ==="
     git clone ${var.repo_url} /opt/app
@@ -619,12 +603,13 @@ resource "google_compute_instance" "test_runner_vm" {
     # Write server addresses to env file for easy sourcing
     # change BUYER_SERVER and SELLER_SERVER
     cat > /opt/app/.env <<'ENVEOF'
-export BUYER_SERVER="${google_compute_instance.buyer_server_vm.network_interface[0].access_config[0].nat_ip}"
+export BUYER_SERVER="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip}"
 export BUYER_PORT=6000
-export SELLER_SERVER="${google_compute_instance.seller_server_vm.network_interface[0].access_config[0].nat_ip}"
+export SELLER_SERVER="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip}"
 export SELLER_PORT=5000
-export PRODUCT_DB_HOSTS=${join(",", google_compute_address.internal_ip[*].address)}
-export CUSTOMER_DB_IP="${google_compute_instance.customer_db_vm.network_interface[0].network_ip}"
+export ZONE="${var.zone}"
+export BUYER_SERVERS="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm2.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm3.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm4.network_interface[0].access_config[0].nat_ip}"
+export SELLER_SERVERS="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm2.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm3.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm4.network_interface[0].access_config[0].nat_ip}"
 ENVEOF
   SCRIPT
 

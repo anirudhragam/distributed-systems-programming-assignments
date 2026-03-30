@@ -132,7 +132,7 @@ services:
       dockerfile: ./services/customer-db/Dockerfile
     container_name: customer_db_container_0
     ports:
-      - "5433:5432"    # PostgreSQL port (mapped to 5433 on host)
+      - "5440:5432"    # PostgreSQL port (mapped to 5440 on host)
       - "50052:50052"  # gRPC port
     environment:
       POSTGRES_DB: customer_db
@@ -147,6 +147,7 @@ services:
       - distributed_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
+      start_period: 30s
       interval: 5s
       timeout: 5s
       retries: 5
@@ -157,7 +158,7 @@ services:
       dockerfile: ./services/customer-db/Dockerfile
     container_name: customer_db_container_1
     ports:
-      - "5434:5432"    # PostgreSQL port (mapped to 5434 on host)
+      - "5441:5432"    # PostgreSQL port (mapped to 5441 on host)
       - "50053:50052"  # gRPC port
     environment:
       POSTGRES_DB: customer_db
@@ -172,6 +173,7 @@ services:
       - distributed_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
+      start_period: 30s
       interval: 5s
       timeout: 5s
       retries: 5
@@ -182,7 +184,7 @@ services:
       dockerfile: ./services/customer-db/Dockerfile
     container_name: customer_db_container_2
     ports:
-      - "5435:5432"    # PostgreSQL port (mapped to 5435 on host)
+      - "5442:5432"    # PostgreSQL port (mapped to 5442 on host)
       - "50054:50052"  # gRPC port
     environment:
       POSTGRES_DB: customer_db
@@ -198,6 +200,7 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
       interval: 5s
+      start_period: 30s
       timeout: 5s
       retries: 5
 
@@ -207,7 +210,7 @@ services:
       dockerfile: ./services/customer-db/Dockerfile
     container_name: customer_db_container_3
     ports:
-      - "5436:5432"    # PostgreSQL port (mapped to 5436 on host)
+      - "5443:5432"    # PostgreSQL port (mapped to 5443 on host)
       - "50055:50052"  # gRPC port
     environment:
       POSTGRES_DB: customer_db
@@ -222,6 +225,7 @@ services:
       - distributed_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
+      start_period: 30s
       interval: 5s
       timeout: 5s
       retries: 5
@@ -232,7 +236,7 @@ services:
       dockerfile: ./services/customer-db/Dockerfile
     container_name: customer_db_container_4
     ports:
-      - "5437:5432"    # PostgreSQL port (mapped to 5437 on host)
+      - "5444:5432"    # PostgreSQL port (mapped to 5444 on host)
       - "50056:50052"  # gRPC port
     environment:
       POSTGRES_DB: customer_db
@@ -247,6 +251,7 @@ services:
       - distributed_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db && nc -z localhost 50052"]
+      start_period: 30s
       interval: 5s
       timeout: 5s
       retries: 5

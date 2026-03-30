@@ -1,45 +1,56 @@
 #!/bin/bash
-# Reset databases between performance test runs.
-# Run from the test-runner VM after sourcing .env:
+# Reset product-db and customer-db tables between performance test runs.
+# Run from test-runner VM after sourcing .env:
 #   cd /opt/app && source .env && bash reset_dbs.sh
 
 set -e
-
 ZONE="${ZONE:-us-west1-a}"
 
-echo "Resetting product-db..."
-gcloud compute ssh product-db-vm --zone="$ZONE" --command="
-  sudo docker stop product-db
-  sudo docker rm product-db
-  sudo docker volume rm product_db_data
-  sudo docker run -d \
-    --name product-db \
-    --restart unless-stopped \
-    -p 50051:50051 \
-    -e POSTGRES_DB=product_db \
-    -e POSTGRES_USER=product_user \
-    -e POSTGRES_PASSWORD=product_password \
-    -v product_db_data:/var/lib/postgresql/data \
-    product-db:latest
-"
+echo "Truncating product-db tables on VM1 (nodes 0 and 1)..."
+gcloud compute ssh vm1 --zone="$ZONE" --command="
+  sudo docker exec product-db-0 psql -U product_user -d product_db -c 'TRUNCATE TABLE products RESTART IDENTITY CASCADE;'
+  sudo docker exec product-db-1 psql -U product_user -d product_db -c 'TRUNCATE TABLE products RESTART IDENTITY CASCADE;'
+" -- -o StrictHostKeyChecking=no  
 
-echo "Resetting customer-db..."
-gcloud compute ssh customer-db-vm --zone="$ZONE" --command="
-  sudo docker stop customer-db
-  sudo docker rm customer-db
-  sudo docker volume rm customer_db_data
-  sudo docker run -d \
-    --name customer-db \
-    --restart unless-stopped \
-    -p 50052:50052 \
-    -e POSTGRES_DB=customer_db \
-    -e POSTGRES_USER=customer_user \
-    -e POSTGRES_PASSWORD=customer_password \
-    -v customer_db_data:/var/lib/postgresql/data \
-    customer-db:latest
-"
+echo "Truncating product-db tables on VM2..."
+gcloud compute ssh vm2 --zone="$ZONE" --command="
+  sudo docker exec product-db-2 psql -U product_user -d product_db -c 'TRUNCATE TABLE products RESTART IDENTITY CASCADE;'
+" -- -o StrictHostKeyChecking=no  
 
-echo "Waiting for databases to initialize..."
-sleep 15
+echo "Truncating product-db tables on VM3..."
+gcloud compute ssh vm3 --zone="$ZONE" --command="
+  sudo docker exec product-db-3 psql -U product_user -d product_db -c 'TRUNCATE TABLE products RESTART IDENTITY CASCADE;'
+" -- -o StrictHostKeyChecking=no  
 
-echo "Databases reset successfully."
+echo "Truncating product-db tables on VM4..."
+gcloud compute ssh vm4 --zone="$ZONE" --command="
+  sudo docker exec product-db-4 psql -U product_user -d product_db -c 'TRUNCATE TABLE products RESTART IDENTITY CASCADE;'
+" -- -o StrictHostKeyChecking=no  
+
+echo "Truncating customer-db tables on VM1 (nodes 0 and 1)..."
+gcloud compute ssh vm1 --zone="$ZONE" --command="
+  sudo docker exec customer-db-0 psql -U customer_user -d customer_db \
+    -c 'TRUNCATE TABLE sellers, buyers, seller_sessions, buyer_sessions, active_carts, saved_carts, transactions, purchases RESTART IDENTITY CASCADE;'
+  sudo docker exec customer-db-1 psql -U customer_user -d customer_db \
+    -c 'TRUNCATE TABLE sellers, buyers, seller_sessions, buyer_sessions, active_carts, saved_carts, transactions, purchases RESTART IDENTITY CASCADE;'
+" -- -o StrictHostKeyChecking=no  
+
+echo "Truncating customer-db tables on VM2..."
+gcloud compute ssh vm2 --zone="$ZONE" --command="
+  sudo docker exec customer-db-2 psql -U customer_user -d customer_db \
+    -c 'TRUNCATE TABLE sellers, buyers, seller_sessions, buyer_sessions, active_carts, saved_carts, transactions, purchases RESTART IDENTITY CASCADE;'
+" -- -o StrictHostKeyChecking=no  
+
+echo "Truncating customer-db tables on VM3..."
+gcloud compute ssh vm3 --zone="$ZONE" --command="
+  sudo docker exec customer-db-3 psql -U customer_user -d customer_db \
+    -c 'TRUNCATE TABLE sellers, buyers, seller_sessions, buyer_sessions, active_carts, saved_carts, transactions, purchases RESTART IDENTITY CASCADE;'
+" -- -o StrictHostKeyChecking=no  
+
+echo "Truncating customer-db tables on VM4..."
+gcloud compute ssh vm4 --zone="$ZONE" --command="
+  sudo docker exec customer-db-4 psql -U customer_user -d customer_db \
+    -c 'TRUNCATE TABLE sellers, buyers, seller_sessions, buyer_sessions, active_carts, saved_carts, transactions, purchases RESTART IDENTITY CASCADE;'
+" -- -o StrictHostKeyChecking=no  
+
+echo "All databases reset successfully."

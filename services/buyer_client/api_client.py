@@ -13,7 +13,7 @@ class BuyerAPIClient:
     """Client for making REST API calls to the buyer backend server"""
 
     def __init__(self, server_host: str = "buyer-server-0", server_port: int = 6000):
-        addrs = os.getenv("SERVER_ADDRS", "buyer-server-0:6000")
+        addrs = os.getenv("SERVER_ADDRS", f"{server_host}:{server_port}")
         self.servers = [(h, int(p)) for h, p in
                         (a.split(":") for a in addrs.split(","))]
         self.idx = 0
