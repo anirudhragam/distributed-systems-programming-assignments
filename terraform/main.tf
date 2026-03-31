@@ -29,10 +29,7 @@ locals {
   SCRIPT
 
 
-  abp_peers_vm1 = "customer-db-0:5100,customer-db-1:5100,${google_compute_address.vm2_internal.address}:5100,${google_compute_address.vm3_internal.address}:5100,${google_compute_address.vm4_internal.address}:5100"
-  abp_peers_vm2 = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,customer-db-2:5100,${google_compute_address.vm3_internal.address}:5100,${google_compute_address.vm4_internal.address}:5100"
-  abp_peers_vm3 = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,${google_compute_address.vm2_internal.address}:5100,customer-db-3:5100,${google_compute_address.vm4_internal.address}:5100"
-  abp_peers_vm4 = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,${google_compute_address.vm2_internal.address}:5100,${google_compute_address.vm3_internal.address}:5100,customer-db-4:5100"
+  abp_peers = "${google_compute_address.vm1_internal.address}:5100,${google_compute_address.vm1_internal.address}:5101,${google_compute_address.vm2_internal.address}:5100,${google_compute_address.vm3_internal.address}:5100,${google_compute_address.vm4_internal.address}:5100"
 
   raft_partners_db_0 = "${google_compute_address.vm1_internal.address}:12346,${google_compute_address.vm2_internal.address}:12345,${google_compute_address.vm3_internal.address}:12345,${google_compute_address.vm4_internal.address}:12345"
   raft_partners_db_1 = "${google_compute_address.vm1_internal.address}:12345,${google_compute_address.vm2_internal.address}:12345,${google_compute_address.vm3_internal.address}:12345,${google_compute_address.vm4_internal.address}:12345"
@@ -154,36 +151,35 @@ resource "google_compute_instance" "vm1" {
       product-db:latest
 
     echo " [vm1] Starting customer-db-0 (node 0, UDP 5100, gRPC 50052) "
-    docker run -d --name customer-db-0 --network app-net --restart unless-stopped \
-      -p 50052:50052 \
-      -p 5100:5100/udp \
+    docker run -d --name customer-db-0 --network host --restart unless-stopped \
       -e POSTGRES_DB=customer_db \
       -e POSTGRES_USER=customer_user \
       -e POSTGRES_PASSWORD=customer_password \
       -e ABP_NODE_ID=0 \
-      -e "ABP_PEERS=${local.abp_peers_vm1}" \
+      -e "ABP_PEERS=${local.abp_peers}" \
       -e ABP_UDP_PORT=5100 \
       -e GRPC_PORT=50052 \
       -v customer_db_0_data:/var/lib/postgresql/data \
       customer-db:latest
 
     echo " [vm1] Starting customer-db-1 (node 1, UDP 5101, gRPC 50053) "
-    docker run -d --name customer-db-1 --network app-net --restart unless-stopped \
-      -p 50053:50052 \
-      -p 5101:5100/udp \
+    docker run -d --name customer-db-1 --network host --restart unless-stopped \
       -e POSTGRES_DB=customer_db \
       -e POSTGRES_USER=customer_user \
       -e POSTGRES_PASSWORD=customer_password \
       -e ABP_NODE_ID=1 \
-      -e "ABP_PEERS=${local.abp_peers_vm1}" \
-      -e ABP_UDP_PORT=5100 \
-      -e GRPC_PORT=50052 \
+      -e "ABP_PEERS=${local.abp_peers}" \
+      -e ABP_UDP_PORT=5101 \
+      -e GRPC_PORT=50053 \
+      -e PGPORT=5433 \
       -v customer_db_1_data:/var/lib/postgresql/data \
       customer-db:latest
 
-    echo " [vm1] Waiting for customer-db-0 "
+    echo " [vm1] Waiting for customer-db-0 and customer-db-1 "
     until docker exec customer-db-0 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
     until nc -z localhost 50052; do sleep 2; done
+    until docker exec customer-db-1 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until nc -z localhost 50053; do sleep 2; done
 
     echo " [vm1] Starting financial-transactions "
     docker run -d --name financial-transactions --network app-net --restart unless-stopped \
@@ -196,7 +192,7 @@ resource "google_compute_instance" "vm1" {
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=5000 \
       -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
-      -e CUSTOMER_DB_HOST=customer-db-0 \
+      -e CUSTOMER_DB_HOST=${google_compute_address.vm1_internal.address} \
       -e CUSTOMER_DB_PORT=50052 \
       seller-server:latest
 
@@ -206,7 +202,7 @@ resource "google_compute_instance" "vm1" {
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
       -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
-      -e CUSTOMER_DB_HOST=customer-db-0 \
+      -e CUSTOMER_DB_HOST=${google_compute_address.vm1_internal.address} \
       -e CUSTOMER_DB_PORT=50052 \
       -e FINANCIAL_TRANSACTIONS_HOST=financial-transactions \
       -e FINANCIAL_TRANSACTIONS_PORT=8000 \
@@ -282,14 +278,12 @@ resource "google_compute_instance" "vm2" {
       product-db:latest
 
     echo " [vm2] Starting customer-db-2 (node 2, UDP 5100, gRPC 50052) "
-    docker run -d --name customer-db-2 --network app-net --restart unless-stopped \
-      -p 50052:50052 \
-      -p 5100:5100/udp \
+    docker run -d --name customer-db-2 --network host --restart unless-stopped \
       -e POSTGRES_DB=customer_db \
       -e POSTGRES_USER=customer_user \
       -e POSTGRES_PASSWORD=customer_password \
       -e ABP_NODE_ID=2 \
-      -e "ABP_PEERS=${local.abp_peers_vm2}" \
+      -e "ABP_PEERS=${local.abp_peers}" \
       -e ABP_UDP_PORT=5100 \
       -e GRPC_PORT=50052 \
       -v customer_db_2_data:/var/lib/postgresql/data \
@@ -305,7 +299,7 @@ resource "google_compute_instance" "vm2" {
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=5000 \
       -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
-      -e CUSTOMER_DB_HOST=customer-db-2 \
+      -e CUSTOMER_DB_HOST=${google_compute_address.vm2_internal.address} \
       -e CUSTOMER_DB_PORT=50052 \
       seller-server:latest
 
@@ -315,7 +309,7 @@ resource "google_compute_instance" "vm2" {
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
       -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
-      -e CUSTOMER_DB_HOST=customer-db-2 \
+      -e CUSTOMER_DB_HOST=${google_compute_address.vm2_internal.address} \
       -e CUSTOMER_DB_PORT=50052 \
       -e FINANCIAL_TRANSACTIONS_HOST=${google_compute_address.vm1_internal.address} \
       -e FINANCIAL_TRANSACTIONS_PORT=8000 \
@@ -393,14 +387,12 @@ resource "google_compute_instance" "vm3" {
       product-db:latest
 
     echo " [vm3] Starting customer-db-3 (node 3, UDP 5100, gRPC 50052) "
-    docker run -d --name customer-db-3 --network app-net --restart unless-stopped \
-      -p 50052:50052 \
-      -p 5100:5100/udp \
+    docker run -d --name customer-db-3 --network host --restart unless-stopped \
       -e POSTGRES_DB=customer_db \
       -e POSTGRES_USER=customer_user \
       -e POSTGRES_PASSWORD=customer_password \
       -e ABP_NODE_ID=3 \
-      -e "ABP_PEERS=${local.abp_peers_vm3}" \
+      -e "ABP_PEERS=${local.abp_peers}" \
       -e ABP_UDP_PORT=5100 \
       -e GRPC_PORT=50052 \
       -v customer_db_3_data:/var/lib/postgresql/data \
@@ -416,7 +408,7 @@ resource "google_compute_instance" "vm3" {
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=5000 \
       -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
-      -e CUSTOMER_DB_HOST=customer-db-3 \
+      -e CUSTOMER_DB_HOST=${google_compute_address.vm3_internal.address} \
       -e CUSTOMER_DB_PORT=50052 \
       seller-server:latest
 
@@ -426,7 +418,7 @@ resource "google_compute_instance" "vm3" {
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
       -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
-      -e CUSTOMER_DB_HOST=customer-db-3 \
+      -e CUSTOMER_DB_HOST=${google_compute_address.vm3_internal.address} \
       -e CUSTOMER_DB_PORT=50052 \
       -e FINANCIAL_TRANSACTIONS_HOST=${google_compute_address.vm1_internal.address} \
       -e FINANCIAL_TRANSACTIONS_PORT=8000 \
@@ -502,14 +494,12 @@ resource "google_compute_instance" "vm4" {
       product-db:latest
 
     echo "[vm4] Starting customer-db-4 (node 4, UDP 5100, gRPC 50052)"
-    docker run -d --name customer-db-4 --network app-net --restart unless-stopped \
-      -p 50052:50052 \
-      -p 5100:5100/udp \
+    docker run -d --name customer-db-4 --network host --restart unless-stopped \
       -e POSTGRES_DB=customer_db \
       -e POSTGRES_USER=customer_user \
       -e POSTGRES_PASSWORD=customer_password \
       -e ABP_NODE_ID=4 \
-      -e "ABP_PEERS=${local.abp_peers_vm4}" \
+      -e "ABP_PEERS=${local.abp_peers}" \
       -e ABP_UDP_PORT=5100 \
       -e GRPC_PORT=50052 \
       -v customer_db_4_data:/var/lib/postgresql/data \
@@ -525,7 +515,7 @@ resource "google_compute_instance" "vm4" {
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=5000 \
       -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
-      -e CUSTOMER_DB_HOST=customer-db-4 \
+      -e CUSTOMER_DB_HOST=${google_compute_address.vm4_internal.address} \
       -e CUSTOMER_DB_PORT=50052 \
       seller-server:latest
 
@@ -535,7 +525,7 @@ resource "google_compute_instance" "vm4" {
       -e SERVER_HOST=0.0.0.0 \
       -e SERVER_PORT=6000 \
       -e PRODUCT_DB_HOSTS="${local.product_db_hosts}" \
-      -e CUSTOMER_DB_HOST=customer-db-4 \
+      -e CUSTOMER_DB_HOST=${google_compute_address.vm4_internal.address} \
       -e CUSTOMER_DB_PORT=50052 \
       -e FINANCIAL_TRANSACTIONS_HOST=${google_compute_address.vm1_internal.address} \
       -e FINANCIAL_TRANSACTIONS_PORT=8000 \

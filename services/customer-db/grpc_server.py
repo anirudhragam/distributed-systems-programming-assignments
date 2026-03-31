@@ -35,7 +35,7 @@ class CustomerDBServicer(customer_db_pb2_grpc.CustomerDBServiceServicer):
             user=os.getenv("POSTGRES_USER", "customer_user"),
             password=os.getenv("POSTGRES_PASSWORD", "customer_password"),
             host="localhost",  # PostgreSQL runs in same container
-            port="5432",
+            port=os.getenv("PGPORT", "5432"),
             database=os.getenv("POSTGRES_DB", "customer_db"),
         )
 
