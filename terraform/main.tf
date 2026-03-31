@@ -144,7 +144,7 @@ resource "google_compute_instance" "vm1" {
     # product-db-1: gRPC exposed on 50054, Raft exposed on 12346
     docker run -d --name product-db-1 --network app-net --restart unless-stopped \
       -p 50054:50051 \
-      -p 12346:12345 \
+      -p 12346:12346 \
       -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
       -e SELF_IP="${google_compute_address.vm1_internal.address}" \
       -e SELF_PORT=12346 \
@@ -227,7 +227,7 @@ resource "google_compute_instance" "vm2" {
   zone         = var.zone
   project      = var.project_id
 
-  tags = ["customer-db", "ecommerce-app", "ecommerce"]
+  tags = ["customer-db", "product-db", "ecommerce-app", "ecommerce"]
 
   boot_disk {
     initialize_params {
@@ -338,7 +338,7 @@ resource "google_compute_instance" "vm3" {
   zone         = var.zone
   project      = var.project_id
 
-  tags = ["customer-db", "ecommerce-app", "ecommerce"]
+  tags = ["customer-db", "product-db", "ecommerce-app", "ecommerce"]
 
   boot_disk {
     initialize_params {
@@ -447,7 +447,7 @@ resource "google_compute_instance" "vm4" {
   zone         = var.zone
   project      = var.project_id
 
-  tags = ["customer-db", "ecommerce-app", "ecommerce"]
+  tags = ["customer-db", "product-db", "ecommerce-app", "ecommerce"]
 
   boot_disk {
     initialize_params {
