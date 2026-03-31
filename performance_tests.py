@@ -1,14 +1,14 @@
+import argparse
+import os
 import random
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import os
-import argparse
-from services.buyer_client.api_client import BuyerAPIClient
-from services.seller_client.api_client import SellerAPIClient
-from services.buyer_client.session import BuyerSession
-from services.seller_client.session import SellerSession
 
+from services.buyer_client.api_client import BuyerAPIClient
+from services.buyer_client.session import BuyerSession
+from services.seller_client.api_client import SellerAPIClient
+from services.seller_client.session import SellerSession
 
 BUYER_SERVER = os.getenv("BUYER_SERVER", "34.182.100.10")
 BUYER_PORT = int(os.getenv("BUYER_PORT", "6000"))
@@ -22,8 +22,9 @@ SELLER_SERVERS = [s.strip() for s in os.getenv("SELLER_SERVERS", SELLER_SERVER).
 def run_seller_operations(seller_id: int):
     response_times = []
     try:
-        server_ip = SELLER_SERVERS[seller_id % len(SELLER_SERVERS)]
-        client = SellerAPIClient(server_ip, SELLER_SERVER_PORT)
+        server_idx = (seller_id-1) % len(SELLER_SERVERS)
+        server_addr = SELLER_SERVERS[server_idx]
+        client = SellerAPIClient(server_idx, server_addr, SELLER_SERVER_PORT)
 
         # Create unique credentials
         username = f"seller_{seller_id}_{int(time.time() * 1000)}"
@@ -100,8 +101,9 @@ def run_seller_operations(seller_id: int):
 def run_buyer_operations(buyer_id: int):
     response_times = []
     try:
-        server_ip = BUYER_SERVERS[buyer_id % len(BUYER_SERVERS)]
-        client = BuyerAPIClient(server_ip, BUYER_PORT)
+        server_idx = (buyer_id-1) % len(BUYER_SERVERS)
+        server_addr = BUYER_SERVERS[server_idx]
+        client = BuyerAPIClient(server_idx, server_addr, BUYER_PORT)
 
         # Create unique credentials
         username = f"buyer_{buyer_id}_{int(time.time() * 1000)}"

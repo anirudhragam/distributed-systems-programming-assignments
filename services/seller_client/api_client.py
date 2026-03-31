@@ -12,14 +12,15 @@ except ImportError:
 class SellerAPIClient:
     """Client for making REST API calls to the seller backend server"""
 
-    def __init__(self, server_host: str = "seller_server", server_port: int = 5000):
-        addrs = os.getenv("SERVER_ADDRS", f"{server_host}:{server_port}")
+    def __init__(self, server_idx: int = 0, server_host: str = "seller_server", server_port: int = 5000):
+        addrs = os.getenv("SELLER_SERVERS", f"{server_host}:{server_port}")
         self.servers = [(h, int(p)) for h,p in
                         (a.split(":") for a in addrs.split(","))]
+        print(f'Seller {server_host} servers: {self.servers}')
         self.base_url = f"http://{server_host}:{server_port}/api"
         self.session_token = None
 
-        self.idx = 0
+        self.idx = server_idx
         self.set_url()
 
         # Setting request timeout to be 15 minutes

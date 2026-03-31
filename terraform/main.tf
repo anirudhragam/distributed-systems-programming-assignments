@@ -608,8 +608,8 @@ export BUYER_PORT=6000
 export SELLER_SERVER="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip}"
 export SELLER_PORT=5000
 export ZONE="${var.zone}"
-export BUYER_SERVERS="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm2.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm3.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm4.network_interface[0].access_config[0].nat_ip}"
-export SELLER_SERVERS="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm2.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm3.network_interface[0].access_config[0].nat_ip},${google_compute_instance.vm4.network_interface[0].access_config[0].nat_ip}"
+export BUYER_SERVERS="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip}:6000,${google_compute_instance.vm2.network_interface[0].access_config[0].nat_ip}:6000,${google_compute_instance.vm3.network_interface[0].access_config[0].nat_ip}:6000,${google_compute_instance.vm4.network_interface[0].access_config[0].nat_ip}:6000"
+export SELLER_SERVERS="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip}:5000,${google_compute_instance.vm2.network_interface[0].access_config[0].nat_ip}:5000,${google_compute_instance.vm3.network_interface[0].access_config[0].nat_ip}:5000,${google_compute_instance.vm4.network_interface[0].access_config[0].nat_ip}:5000"
 ENVEOF
   SCRIPT
 

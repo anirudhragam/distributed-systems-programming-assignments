@@ -1,6 +1,7 @@
 # API client for communicating with buyer server using REST
 
 import os
+
 import requests
 
 try:
@@ -12,11 +13,12 @@ except ImportError:
 class BuyerAPIClient:
     """Client for making REST API calls to the buyer backend server"""
 
-    def __init__(self, server_host: str = "buyer-server-0", server_port: int = 6000):
-        addrs = os.getenv("SERVER_ADDRS", f"{server_host}:{server_port}")
+    def __init__(self, server_idx: int = 0, server_host: str = "buyer-server-0", server_port: int = 6000):
+        addrs = os.getenv("BUYER_SERVERS", f"{server_host}:{server_port}")
         self.servers = [(h, int(p)) for h, p in
                         (a.split(":") for a in addrs.split(","))]
-        self.idx = 0
+        print(f'Buyer {server_host} servers: {self.servers}')
+        self.idx = server_idx
         self.set_url()
         self.session_token = None
 
