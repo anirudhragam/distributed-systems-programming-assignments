@@ -16,7 +16,7 @@ class SellerAPIClient:
         addrs = os.getenv("SELLER_SERVERS", f"{server_host}:{server_port}")
         self.servers = [(h, int(p)) for h,p in
                         (a.split(":") for a in addrs.split(","))]
-        print(f'Seller {server_host} servers: {self.servers}')
+        
         self.base_url = f"http://{server_host}:{server_port}/api"
         self.session_token = None
 
