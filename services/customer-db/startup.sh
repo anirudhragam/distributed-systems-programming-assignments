@@ -3,14 +3,10 @@ set -e
 
 # Function to start gRPC server after PostgreSQL is ready
 start_grpc_server() {
-    echo "Waiting for PostgreSQL to be ready..."
-    until pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} > /dev/null 2>&1; do
+    until psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c '\q' > /dev/null 2>&1; do
         sleep 1
     done
-
     echo "PostgreSQL is ready! Starting gRPC server..."
-    sleep 2  # Extra safety margin
-
     cd /app
     python3 grpc_server.py
 }

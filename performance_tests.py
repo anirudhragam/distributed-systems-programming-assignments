@@ -230,7 +230,7 @@ def run_scenario(num_sellers: int, num_buyers: int):
     seller_response_times = []
     buyer_response_times = []
 
-    with ThreadPoolExecutor(max_workers=num_sellers + num_buyers) as executor:
+    with ThreadPoolExecutor(max_workers=min(num_sellers + num_buyers, 20)) as executor:
         # Submit all seller tasks
         seller_futures = { executor.submit(run_seller_operations, i): ("seller", i) for i in range(1, num_sellers+1)}
         buyer_futures = { executor.submit(run_buyer_operations, i): ("buyer", i) for i in range(1, num_buyers+1) }
