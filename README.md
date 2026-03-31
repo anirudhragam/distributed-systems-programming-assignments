@@ -442,3 +442,119 @@ bash /opt/app/reset_dbs.sh
 EOF
 chmod +x ~/restart_services_except_vm2.sh
 ```
+
+---
+
+One-time Setup
+gcloud compute ssh test-runner-vm --zone=us-west1-a
+cd /opt/app && source .env
+
+# Verify all containers are up
+```bash
+for vm in vm1 vm2 vm3 vm4; do
+  echo "=== $vm ==="
+  gcloud compute ssh $vm --zone=$ZONE --command="sudo docker ps --format '{{.Names}} {{.Status}}'" -- -o StrictHostKeyChecking=no
+done
+
+bash /opt/app/restart_services.sh
+```
+
+## Failure Condition A: All replicas running (baseline)
+
+```bash
+bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 1 --num-buyers 1 2>&1 | tee ~/results_a_1x1.txt
+
+bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 10 --num-buyers 10 2>&1 | tee ~/results_a_10x10.txt
+
+bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 100 --num-buyers 100 2>&1 | tee ~/results_a_100x100.txt
+```
+
+---
+
+## Failure Condition B: One seller-server and one buyer-server fail
+
+Stop VM1's app servers so that clients with id=1,5,9,... (idx=0) hit the failed server and retry against VM2:
+
+```bash
+gcloud compute ssh vm1 --zone=$ZONE --command="sudo docker stop seller-server-0 buyer-server-0" -- -o StrictHostKeyChecking=no
+```
+
+For `restart_services_except_vm2.sh`, you may need a `restart_services_except_vm1.sh` variant, OR just manually restart after each test:
+
+```bash
+# Before each Condition B scenario:
+for vm in vm2 vm3 vm4; do
+  gcloud compute ssh $vm --zone=$ZONE --command="sudo docker ps --format '{{.Names}}' | grep -E 'customer-db|seller-server|buyer-server' | xargs sudo docker restart" -- -o StrictHostKeyChecking=no
+done
+gcloud compute ssh vm1 --zone=$ZONE --command="sudo docker ps --format '{{.Names}}' | grep 'customer-db' | xargs sudo docker restart" -- -o StrictHostKeyChecking=no
+sleep 15
+bash /opt/app/reset_dbs.sh
+
+# Stop VM1 app servers (keep customer-db up for ABP quorum)
+gcloud compute ssh vm1 --zone=$ZONE --command="sudo docker stop seller-server-0 buyer-server-0" -- -o StrictHostKeyChecking=no
+```
+
+```bash
+# Scenario 1: seller/buyer 1 → VM1 (down) → fails over to VM2
+python3 performance_tests.py --num-sellers 1 --num-buyers 1 2>&1 | tee ~/results_b_1x1.txt
+
+# Scenario 2: ids 1-10; sellers/buyers 1,5,9 hit VM1 (down) → fail over → 3/10 affected
+python3 performance_tests.py --num-sellers 10 --num-buyers 10 2>&1 | tee ~/results_b_10x10.txt
+
+# Scenario 3: 25/100 clients hit VM1 (down) → fail over
+python3 performance_tests.py --num-sellers 100 --num-buyers 100 2>&1 | tee ~/results_b_100x100.txt
+
+# Restore
+gcloud compute ssh vm1 --zone=$ZONE --command="sudo docker start seller-server-0 buyer-server-0" -- -o StrictHostKeyChecking=no
+```
+
+---
+
+## Failure Condition C: One non-leader product-db replica fails
+
+Stop product-db-3 (VM3) — assumed non-leader. Raft maintains quorum with 4/5 nodes.
+
+```bash
+gcloud compute ssh vm3 --zone=$ZONE --command="sudo docker stop product-db-3" -- -o StrictHostKeyChecking=no
+
+bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 1 --num-buyers 1 2>&1 | tee ~/results_c_1x1.txt
+
+bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 10 --num-buyers 10 2>&1 | tee ~/results_c_10x10.txt
+
+bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 100 --num-buyers 100 2>&1 | tee ~/results_c_100x100.txt
+
+# Restore
+gcloud compute ssh vm3 --zone=$ZONE --command="sudo docker start product-db-3" -- -o StrictHostKeyChecking=no
+sleep 30  # wait for node to catch up
+```
+
+---
+
+## Failure Condition D: Leader product-db replica fails
+
+First identify the leader (each VM has its own product-db node):
+
+```bash
+# VM1 has product-db-0 and product-db-1; VM2/3/4 have product-db-2/3/4
+gcloud compute ssh vm1 --zone=$ZONE --command="for c in product-db-0 product-db-1; do echo \$c:; sudo docker logs \$c 2>&1 | grep -Ei 'leader|elected|became' | tail -2; done" -- -o StrictHostKeyChecking=no
+gcloud compute ssh vm2 --zone=$ZONE --command="sudo docker logs product-db-2 2>&1 | grep -Ei 'leader|elected|became' | tail -3" -- -o StrictHostKeyChecking=no
+gcloud compute ssh vm3 --zone=$ZONE --command="sudo docker logs product-db-3 2>&1 | grep -Ei 'leader|elected|became' | tail -3" -- -o StrictHostKeyChecking=no
+gcloud compute ssh vm4 --zone=$ZONE --command="sudo docker logs product-db-4 2>&1 | grep -Ei 'leader|elected|became' | tail -3" -- -o StrictHostKeyChecking=no
+```
+
+Assuming product-db-0 on VM1 is leader (adjust vm/container name if not):
+
+```bash
+gcloud compute ssh vm1 --zone=$ZONE --command="sudo docker stop product-db-0" -- -o StrictHostKeyChecking=no
+sleep 10  # wait for re-election
+
+bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 1 --num-buyers 1 2>&1 | tee ~/results_d_1x1.txt
+
+bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 10 --num-buyers 10 2>&1 | tee ~/results_d_10x10.txt
+
+bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 100 --num-buyers 100 2>&1 | tee ~/results_d_100x100.txt
+
+# Restore
+gcloud compute ssh vm1 --zone=$ZONE --command="sudo docker start product-db-0" -- -o StrictHostKeyChecking=no
+sleep 30
+```
