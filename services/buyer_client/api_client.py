@@ -17,7 +17,7 @@ class BuyerAPIClient:
         addrs = os.getenv("BUYER_SERVERS", f"{server_host}:{server_port}")
         self.servers = [(h, int(p)) for h, p in
                         (a.split(":") for a in addrs.split(","))]
-        print(f'Buyer {server_host} servers: {self.servers}')
+        
         self.idx = server_idx
         self.set_url()
         self.session_token = None
