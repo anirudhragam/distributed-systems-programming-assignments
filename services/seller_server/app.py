@@ -27,24 +27,30 @@ customer_db_channel = None
 customer_db_stub = None
 product_db_hosts = None
 product_db_port = None
+_product_db_channels = {}  # host -> grpc.Channel cache
 
 def get_product_db_stub():
     """
     Tries to connect to ANY available node in the cluster.
+    Reuses cached channels to avoid file descriptor exhaustion.
     """
-    # Randomize the list so we don't all dogpile on Node 0
-    random.shuffle(product_db_hosts)
-    
-    for host in product_db_hosts:
+    hosts = product_db_hosts[:]
+    random.shuffle(hosts)
+
+    for host in hosts:
+        addr = host if ":" in host else f"{host}:{product_db_port}"
         try:
-            channel = grpc.insecure_channel(host if ":" in host else f"{host}:{product_db_port}")
-            # Short timeout (2s) to see if the VM is even alive
+            if addr not in _product_db_channels:
+                _product_db_channels[addr] = grpc.insecure_channel(addr)
+            channel = _product_db_channels[addr]
             grpc.channel_ready_future(channel).result(timeout=2)
             return product_db_pb2_grpc.ProductDBServiceStub(channel)
         except (grpc.FutureTimeoutError, grpc.RpcError):
             print(f"Node {host} is down/starting, trying next...")
+            # Remove stale channel so it gets recreated next time
+            _product_db_channels.pop(addr, None)
             continue
-            
+
     return None # All nodes are down
 
 def call_with_failover(method_name: str, request):

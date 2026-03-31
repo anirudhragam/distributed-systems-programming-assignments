@@ -594,6 +594,9 @@ resource "google_compute_instance" "test_runner_vm" {
     apt-get update -y
     apt-get install -y python3 python3-pip git curl google-cloud-cli
 
+    echo "=== [test-runner-vm] Waiting for app VMs to finish initializing ==="
+    sleep 600
+
     echo "=== [test-runner-vm] Cloning repo ==="
     git clone ${var.repo_url} /opt/app
     cd /opt/app
@@ -602,7 +605,7 @@ resource "google_compute_instance" "test_runner_vm" {
 
     # Write server addresses to env file for easy sourcing
     # change BUYER_SERVER and SELLER_SERVER
-    cat > /opt/app/.env <<'ENVEOF'
+    cat > /opt/app/.env << ENVEOF
 export BUYER_SERVER="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip}"
 export BUYER_PORT=6000
 export SELLER_SERVER="${google_compute_instance.vm1.network_interface[0].access_config[0].nat_ip}"
