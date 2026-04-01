@@ -288,6 +288,9 @@ class ABPNode:
         with self.lock:
             result = self.delivery_results.pop(rid, None)
             self.pending_events.pop(rid, None)
+            if not delivered:
+                self.pending_requests.pop(rid, None)
+                self.all_requests.pop(rid, None)
 
         if not delivered or result is None:
             return {"success": False, "error_message": "ABP timeout — write not delivered"}
