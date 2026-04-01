@@ -508,9 +508,10 @@ def serve():
         last_leader = None
         while True:
             time.sleep(1)
-            leader = raft_manager._getLeader()
+            status = raft_manager.getStatus()
+            leader = status.get('leader')
             if leader != last_leader:
-                is_me = raft_manager.isNodeLeader()
+                is_me = status.get('state') == 2
                 if leader:
                     print(f"[RAFT] Leader: {leader} {'<-- THIS NODE' if is_me else ''}", flush=True)
                 else:
