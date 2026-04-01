@@ -28,6 +28,7 @@ class ABPNode:
         self.lock = threading.Lock()
 
         self.local_seq = 0
+        self.gc_watermark = 0
 
         self.all_requests: dict = {}
        
@@ -55,6 +56,22 @@ class ABPNode:
         self.pending_events: dict = {}
         # Contains mappings from (sender_id, local_seq) → SQL result dict
         self.delivery_results: dict = {}
+
+    def _gc(self):
+        """Prune delivered state that all nodes have confirmed receiving.
+        Called under self.lock after each delivery.
+        Does NOT prune sequenced_rids (guards against late retransmitted REQUESTs causing duplicate SQL).
+        """
+        new_watermark = min(self.peer_received_up_to.values()) + 1
+        if new_watermark <= self.gc_watermark:
+            return
+        for g in range(self.gc_watermark, new_watermark):
+            seq_msg = self.sequences.pop(g, None)
+            if seq_msg:
+                rid = tuple(seq_msg["request_id"])
+                self.all_requests.pop(rid, None)
+                self.delivered.discard(rid)
+        self.gc_watermark = new_watermark
 
     def start(self):
         threads = [
@@ -132,12 +149,12 @@ class ABPNode:
                     pass  
 
                 # Precondition 1: all prior SEQUENCE messages exist
-                elif not all(g in self.sequences for g in range(k)):
+                elif not all(g in self.sequences for g in range(self.gc_watermark, k)):
                     pass  # waiting for earlier sequences
 
                 # Precondition 2: all prior requests referenced by sequences are in all_requests
                 elif any(tuple(self.sequences[g]["request_id"]) not in self.all_requests
-                        for g in range(k)):
+                        for g in range(self.gc_watermark, k)):
                     pass  # waiting for earlier requests
 
                 else:
@@ -205,6 +222,7 @@ class ABPNode:
                     if rid in self.pending_events:
                         self.delivery_results[rid] = result
                         self.pending_events[rid].set()
+                    self._gc()
             else:
                 time.sleep(0.001)
 
@@ -234,7 +252,7 @@ class ABPNode:
                 # Gap type 2: missing SEQUENCE — have seq s+1 but not s
                 known_seqs = set(self.sequences.keys())
                 for g in known_seqs:
-                    if g > 0 and (g - 1) not in known_seqs:
+                    if g > self.gc_watermark and (g - 1) not in known_seqs:
                         expected_sequencer = (g - 1) % self.n
                         to_send.append(
                             build_retransmit_sequence(self.node_id, expected_sequencer, g - 1)
@@ -252,7 +270,7 @@ class ABPNode:
         -1 if nothing received yet.
         Called inside the lock.
         """
-        s = -1
+        s = self.gc_watermark - 1
         while True:
             candidate = s + 1
             if candidate not in self.sequences:
