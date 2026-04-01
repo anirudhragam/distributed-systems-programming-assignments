@@ -532,29 +532,54 @@ sleep 30  # wait for node to catch up
 
 ## Failure Condition D: Leader product-db replica fails
 
-First identify the leader (each VM has its own product-db node):
+`services/product-db/grpc_server.py` — add leader change logging
+Add this after raft_manager = RaftManager(...) in serve(). Uses _getLeader() (returns the leader's "ip:port" Raft address) and isNodeLeader() (True only on the leader itself):
 
 ```bash
-# VM1 has product-db-0 and product-db-1; VM2/3/4 have product-db-2/3/4
-gcloud compute ssh vm1 --zone=$ZONE --command="for c in product-db-0 product-db-1; do echo \$c:; sudo docker logs \$c 2>&1 | grep -Ei 'leader|elected|became' | tail -2; done" -- -o StrictHostKeyChecking=no
-gcloud compute ssh vm2 --zone=$ZONE --command="sudo docker logs product-db-2 2>&1 | grep -Ei 'leader|elected|became' | tail -3" -- -o StrictHostKeyChecking=no
-gcloud compute ssh vm3 --zone=$ZONE --command="sudo docker logs product-db-3 2>&1 | grep -Ei 'leader|elected|became' | tail -3" -- -o StrictHostKeyChecking=no
-gcloud compute ssh vm4 --zone=$ZONE --command="sudo docker logs product-db-4 2>&1 | grep -Ei 'leader|elected|became' | tail -3" -- -o StrictHostKeyChecking=no
+import threading, time
+
+def _log_leader():
+    last_leader = None
+    while True:
+        time.sleep(1)
+        leader = raft_manager._getLeader()
+        if leader != last_leader:
+            is_me = raft_manager.isNodeLeader()
+            if leader:
+                print(f"[RAFT] Leader: {leader} {'<-- THIS NODE' if is_me else ''}", flush=True)
+            else:
+                print("[RAFT] No leader (election in progress)", flush=True)
+            last_leader = leader
+
+threading.Thread(target=_log_leader, daemon=True).start()
 ```
+Identify the leader before starting Condition D:
+
+```bash
+for vm in vm1 vm2 vm3 vm4; do
+  echo "=== $vm ==="
+  gcloud compute ssh $vm --zone=$ZONE --command="
+    for c in \$(sudo docker ps --format '{{.Names}}' | grep product-db); do
+      echo \$c:; sudo docker logs \$c 2>&1 | grep '\[RAFT\]' | tail -2
+    done
+  " -- -o StrictHostKeyChecking=no
+done
+```
+The node that prints <-- THIS NODE is the leader. Note which VM and container name it is, then stop it:
 
 Assuming product-db-0 on VM1 is leader (adjust vm/container name if not):
 
 ```bash
 gcloud compute ssh vm1 --zone=$ZONE --command="sudo docker stop product-db-0" -- -o StrictHostKeyChecking=no
-sleep 10  # wait for re-election
+sleep 10  # wait for re-election (~150-500ms, but allow extra margin)
 
 bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 1 --num-buyers 1 2>&1 | tee ~/results_d_1x1.txt
-
 bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 10 --num-buyers 10 2>&1 | tee ~/results_d_10x10.txt
-
 bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 100 --num-buyers 100 2>&1 | tee ~/results_d_100x100.txt
+```
 
-# Restore
+### Restore
+```bash
 gcloud compute ssh vm1 --zone=$ZONE --command="sudo docker start product-db-0" -- -o StrictHostKeyChecking=no
 sleep 30
 ```

@@ -8,6 +8,7 @@ from concurrent import futures
 
 import grpc
 from psycopg2 import extras, pool
+import threading, time
 
 # Add generated code to path
 sys.path.insert(0, '/app/generated')
@@ -503,6 +504,20 @@ def serve():
     # Initialize Raft Manager
     raft_manager = RaftManager(f"{self_ip}:{self_port}", partners)
 
+    def _log_leader():
+        last_leader = None
+        while True:
+            time.sleep(1)
+            leader = raft_manager._getLeader()
+            if leader != last_leader:
+                is_me = raft_manager.isNodeLeader()
+                if leader:
+                    print(f"[RAFT] Leader: {leader} {'<-- THIS NODE' if is_me else ''}", flush=True)
+                else:
+                    print("[RAFT] No leader (election in progress)", flush=True)
+                last_leader = leader
+
+    threading.Thread(target=_log_leader, daemon=True).start()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=100))
     product_db_pb2_grpc.add_ProductDBServiceServicer_to_server(
         ProductDBServicer(raft_manager), server
