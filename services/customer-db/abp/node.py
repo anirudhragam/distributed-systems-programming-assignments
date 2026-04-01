@@ -210,7 +210,7 @@ class ABPNode:
 
     def status_thread(self):
         while True:
-            time.sleep(0.2)
+            time.sleep(0.02)
             with self.lock:
                 rut = self.my_received_up_to()
             status_msg = build_status(self.node_id, rut)
