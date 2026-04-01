@@ -81,7 +81,7 @@ resource "google_compute_instance" "vm1" {
   zone         = var.zone
   project      = var.project_id
 
-  tags = ["customer-db", "product-db", "financial-transactions", "ecommerce-app", "ecommerce"]
+  tags = ["ecommerce", "ecommerce-app", "ecommerce-internal"]
 
   boot_disk {
     initialize_params {
@@ -222,7 +222,7 @@ resource "google_compute_instance" "vm2" {
   zone         = var.zone
   project      = var.project_id
 
-  tags = ["customer-db", "product-db", "ecommerce-app", "ecommerce"]
+  tags = ["ecommerce", "ecommerce-app", "ecommerce-internal"]
 
   boot_disk {
     initialize_params {
@@ -330,7 +330,7 @@ resource "google_compute_instance" "vm3" {
   zone         = var.zone
   project      = var.project_id
 
-  tags = ["customer-db", "product-db", "ecommerce-app", "ecommerce"]
+  tags = ["ecommerce", "ecommerce-app", "ecommerce-internal"]
 
   boot_disk {
     initialize_params {
@@ -436,7 +436,7 @@ resource "google_compute_instance" "vm4" {
   zone         = var.zone
   project      = var.project_id
 
-  tags = ["customer-db", "product-db", "ecommerce-app", "ecommerce"]
+  tags = ["ecommerce", "ecommerce-app", "ecommerce-internal"]
 
   boot_disk {
     initialize_params {

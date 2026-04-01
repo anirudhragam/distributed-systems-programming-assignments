@@ -28,16 +28,25 @@ class CustomerDBServicer(customer_db_pb2_grpc.CustomerDBServiceServicer):
     
     def __init__(self):
         print("Initializing Customer DB gRPC server...")
-        # Create PostgreSQL connection pool
-        self.db_pool = pool.ThreadedConnectionPool(
-            minconn=5,
-            maxconn=100,
-            user=os.getenv("POSTGRES_USER", "customer_user"),
-            password=os.getenv("POSTGRES_PASSWORD", "customer_password"),
-            host="localhost",  # PostgreSQL runs in same container
-            port=os.getenv("PGPORT", "5432"),
-            database=os.getenv("POSTGRES_DB", "customer_db"),
-        )
+        # Create PostgreSQL connection pool — retry until PostgreSQL is fully up
+        # (startup.sh may pass its readiness check during the init phase before
+        # the final PostgreSQL process starts)
+        import time as _time
+        while True:
+            try:
+                self.db_pool = pool.ThreadedConnectionPool(
+                    minconn=5,
+                    maxconn=100,
+                    user=os.getenv("POSTGRES_USER", "customer_user"),
+                    password=os.getenv("POSTGRES_PASSWORD", "customer_password"),
+                    host="localhost",
+                    port=os.getenv("PGPORT", "5432"),
+                    database=os.getenv("POSTGRES_DB", "customer_db"),
+                )
+                break
+            except Exception as e:
+                print(f"PostgreSQL not ready yet ({e}), retrying in 2s...")
+                _time.sleep(2)
 
         # Atomic Broadcast protocol setup
         node_id   = int(os.getenv("ABP_NODE_ID", "0"))

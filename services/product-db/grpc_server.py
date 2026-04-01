@@ -20,17 +20,24 @@ _db_pool = None
 
 class RaftManager(SyncObj):
     def __init__(self, self_addr, partners):
-        # Create PostgreSQL connection pool
+        # Create PostgreSQL connection pool — retry until PostgreSQL is fully up
         global _db_pool
-        _db_pool = pool.ThreadedConnectionPool(
-            minconn=5,
-            maxconn=100,
-            user=os.getenv("POSTGRES_USER", "product_user"),
-            password=os.getenv("POSTGRES_PASSWORD", "product_password"),
-            host="localhost",  # PostgreSQL runs in same container
-            port=os.getenv("PGPORT", "5432"),
-            database=os.getenv("POSTGRES_DB", "product_db"),
-        )
+        import time as _time
+        while True:
+            try:
+                _db_pool = pool.ThreadedConnectionPool(
+                    minconn=5,
+                    maxconn=100,
+                    user=os.getenv("POSTGRES_USER", "product_user"),
+                    password=os.getenv("POSTGRES_PASSWORD", "product_password"),
+                    host="localhost",
+                    port=os.getenv("PGPORT", "5432"),
+                    database=os.getenv("POSTGRES_DB", "product_db"),
+                )
+                break
+            except Exception as e:
+                print(f"PostgreSQL not ready yet ({e}), retrying in 2s...")
+                _time.sleep(2)
         print("Product DB connection pool initialized")
 
         # Clear PostgreSQL so journal replay starts from a clean state.
