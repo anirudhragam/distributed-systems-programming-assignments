@@ -274,6 +274,9 @@ resource "google_compute_instance" "vm2" {
       -v product_db_2_raft:/data/raft \
       product-db:latest
 
+    echo " [vm2] Waiting for product-db-2 gRPC to be ready "
+    until nc -z localhost 50051; do sleep 2; done
+
     echo " [vm2] Starting customer-db-2 (node 2, UDP 5100, gRPC 50052) "
     docker run -d --name customer-db-2 --network host --restart unless-stopped \
       -e POSTGRES_DB=customer_db \
@@ -382,6 +385,9 @@ resource "google_compute_instance" "vm3" {
       -v product_db_3_raft:/data/raft \
       product-db:latest
 
+    echo " [vm3] Waiting for product-db-3 gRPC to be ready "
+    until nc -z localhost 50051; do sleep 2; done
+
     echo " [vm3] Starting customer-db-3 (node 3, UDP 5100, gRPC 50052) "
     docker run -d --name customer-db-3 --network host --restart unless-stopped \
       -e POSTGRES_DB=customer_db \
@@ -487,6 +493,9 @@ resource "google_compute_instance" "vm4" {
       -v product_db_4_data:/var/lib/postgresql/data \
       -v product_db_4_raft:/data/raft \
       product-db:latest
+
+    echo "[vm4] Waiting for product-db-4 gRPC to be ready"
+    until nc -z localhost 50051; do sleep 2; done
 
     echo "[vm4] Starting customer-db-4 (node 4, UDP 5100, gRPC 50052)"
     docker run -d --name customer-db-4 --network host --restart unless-stopped \
