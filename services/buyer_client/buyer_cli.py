@@ -54,7 +54,7 @@ class BuyerCLI:
     """Interactive CLI for buyers"""
 
     def __init__(self, server_host: str = "buyer_server", server_port: int = 6000):
-        self.api_client = BuyerAPIClient(server_host, server_port)
+        self.api_client = BuyerAPIClient(0, server_host, server_port)
         self.session = BuyerSession()
 
     def display_authentication_menu(self):

@@ -16,7 +16,7 @@ class SellerCLI:
     """Interactive CLI for sellers"""
     
     def __init__(self, server_host: str = "seller_server", server_port: int = 5000):
-        self.api_client = SellerAPIClient(server_host, server_port)
+        self.api_client = SellerAPIClient(0, server_host, server_port)
         self.session = SellerSession()
 
     def display_authentication_menu(self):
