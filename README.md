@@ -446,11 +446,11 @@ chmod +x ~/restart_services_except_vm2.sh
 ---
 
 One-time Setup
+```bash
 gcloud compute ssh test-runner-vm --zone=us-west1-a
 cd /opt/app && source .env
 
-# Verify all containers are up
-```bash
+# verify all containers are up
 for vm in vm1 vm2 vm3 vm4; do
   echo "=== $vm ==="
   gcloud compute ssh $vm --zone=$ZONE --command="sudo docker ps --format '{{.Names}} {{.Status}}'" -- -o StrictHostKeyChecking=no

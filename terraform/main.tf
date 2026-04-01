@@ -126,9 +126,7 @@ resource "google_compute_instance" "vm1" {
 
     echo " [vm1] Starting product-db-0 (node 0, gRPC 50051, Raft 12345) "
     # product-db-0: gRPC 50051, Raft 12345
-    docker run -d --name product-db-0 --network app-net --restart unless-stopped \
-      -p 50051:50051 \
-      -p 12345:12345 \
+    docker run -d --name product-db-0 --network host --restart unless-stopped \
       -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
       -e SELF_IP="${google_compute_address.vm1_internal.address}" \
       -e SELF_PORT=12345 \
@@ -139,13 +137,13 @@ resource "google_compute_instance" "vm1" {
 
     echo " [vm1] Starting product-db-1 (node 1, gRPC 50054, Raft 12346) "
     # product-db-1: gRPC exposed on 50054, Raft exposed on 12346
-    docker run -d --name product-db-1 --network app-net --restart unless-stopped \
-      -p 50054:50051 \
-      -p 12346:12346 \
+    docker run -d --name product-db-1 --network host --restart unless-stopped \
       -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
       -e SELF_IP="${google_compute_address.vm1_internal.address}" \
       -e SELF_PORT=12346 \
       -e PARTNERS="${local.raft_partners_db_1}" \
+      -e GRPC_PORT=50054 \
+      -e PGPORT=5433 \
       -v product_db_1_data:/var/lib/postgresql/data \
       -v product_db_1_raft:/data/raft \
       product-db:latest
@@ -159,6 +157,7 @@ resource "google_compute_instance" "vm1" {
       -e "ABP_PEERS=${local.abp_peers}" \
       -e ABP_UDP_PORT=5100 \
       -e GRPC_PORT=50052 \
+      -e PGPORT=5434 \
       -v customer_db_0_data:/var/lib/postgresql/data \
       customer-db:latest
 
@@ -171,14 +170,14 @@ resource "google_compute_instance" "vm1" {
       -e "ABP_PEERS=${local.abp_peers}" \
       -e ABP_UDP_PORT=5101 \
       -e GRPC_PORT=50053 \
-      -e PGPORT=5433 \
+      -e PGPORT=5435 \
       -v customer_db_1_data:/var/lib/postgresql/data \
       customer-db:latest
 
     echo " [vm1] Waiting for customer-db-0 and customer-db-1 "
-    until docker exec customer-db-0 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until docker exec customer-db-0 pg_isready -U customer_user -d customer_db -p 5434 2>/dev/null; do sleep 2; done
     until nc -z localhost 50052; do sleep 2; done
-    until docker exec customer-db-1 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until docker exec customer-db-1 pg_isready -U customer_user -d customer_db -p 5435 2>/dev/null; do sleep 2; done
     until nc -z localhost 50053; do sleep 2; done
 
     echo " [vm1] Starting financial-transactions "
@@ -266,9 +265,7 @@ resource "google_compute_instance" "vm2" {
 
     # VM2: product-db-2
     echo " [vm2] Starting product-db-2 (node 2, gRPC 50051, Raft 12345) "
-    docker run -d --name product-db-2 --network app-net --restart unless-stopped \
-      -p 50051:50051 \
-      -p 12345:12345 \
+    docker run -d --name product-db-2 --network host --restart unless-stopped \
       -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
       -e SELF_IP="${google_compute_address.vm2_internal.address}" \
       -e SELF_PORT=12345 \
@@ -286,11 +283,12 @@ resource "google_compute_instance" "vm2" {
       -e "ABP_PEERS=${local.abp_peers}" \
       -e ABP_UDP_PORT=5100 \
       -e GRPC_PORT=50052 \
+      -e PGPORT=5433 \
       -v customer_db_2_data:/var/lib/postgresql/data \
       customer-db:latest
 
     echo " [vm2] Waiting for customer-db-2 "
-    until docker exec customer-db-2 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until docker exec customer-db-2 pg_isready -U customer_user -d customer_db -p 5433 2>/dev/null; do sleep 2; done
     until nc -z localhost 50052; do sleep 2; done
 
     echo " [vm2] Starting seller-server-1 "
@@ -375,9 +373,7 @@ resource "google_compute_instance" "vm3" {
 
     # VM3: product-db-3
     echo " [vm3] Starting product-db-3 (node 2, gRPC 50051, Raft 12345) "
-    docker run -d --name product-db-3 --network app-net --restart unless-stopped \
-      -p 50051:50051 \
-      -p 12345:12345 \
+    docker run -d --name product-db-3 --network host --restart unless-stopped \
       -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
       -e SELF_IP="${google_compute_address.vm3_internal.address}" \
       -e SELF_PORT=12345 \
@@ -395,11 +391,12 @@ resource "google_compute_instance" "vm3" {
       -e "ABP_PEERS=${local.abp_peers}" \
       -e ABP_UDP_PORT=5100 \
       -e GRPC_PORT=50052 \
+      -e PGPORT=5433 \
       -v customer_db_3_data:/var/lib/postgresql/data \
       customer-db:latest
 
     echo "[vm3] Waiting for customer-db-3"
-    until docker exec customer-db-3 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until docker exec customer-db-3 pg_isready -U customer_user -d customer_db -p 5433 2>/dev/null; do sleep 2; done
     until nc -z localhost 50052; do sleep 2; done
 
     echo "[vm3] Starting seller-server-2"
@@ -482,9 +479,7 @@ resource "google_compute_instance" "vm4" {
 
     # VM4: product-db-4
     echo " [vm4] Starting product-db-4 (node 2, gRPC 50051, Raft 12345) "
-    docker run -d --name product-db-4 --network app-net --restart unless-stopped \
-      -p 50051:50051 \
-      -p 12345:12345 \
+    docker run -d --name product-db-4 --network host --restart unless-stopped \
       -e POSTGRES_DB=product_db -e POSTGRES_USER=product_user -e POSTGRES_PASSWORD=product_password \
       -e SELF_IP="${google_compute_address.vm4_internal.address}" \
       -e SELF_PORT=12345 \
@@ -502,11 +497,12 @@ resource "google_compute_instance" "vm4" {
       -e "ABP_PEERS=${local.abp_peers}" \
       -e ABP_UDP_PORT=5100 \
       -e GRPC_PORT=50052 \
+      -e PGPORT=5433 \
       -v customer_db_4_data:/var/lib/postgresql/data \
       customer-db:latest
 
     echo "[vm4] Waiting for customer-db-4"
-    until docker exec customer-db-4 pg_isready -U customer_user -d customer_db 2>/dev/null; do sleep 2; done
+    until docker exec customer-db-4 pg_isready -U customer_user -d customer_db -p 5433 2>/dev/null; do sleep 2; done
     until nc -z localhost 50052; do sleep 2; done
 
     echo "[vm4] Starting seller-server-3"

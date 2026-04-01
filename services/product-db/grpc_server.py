@@ -28,7 +28,7 @@ class RaftManager(SyncObj):
             user=os.getenv("POSTGRES_USER", "product_user"),
             password=os.getenv("POSTGRES_PASSWORD", "product_password"),
             host="localhost",  # PostgreSQL runs in same container
-            port="5432",
+            port=os.getenv("PGPORT", "5432"),
             database=os.getenv("POSTGRES_DB", "product_db"),
         )
         print("Product DB connection pool initialized")
@@ -500,7 +500,7 @@ def serve():
     product_db_pb2_grpc.add_ProductDBServiceServicer_to_server(
         ProductDBServicer(raft_manager), server
     )
-    server.add_insecure_port('[::]:50051')
+    server.add_insecure_port(f'[::]:{os.getenv("GRPC_PORT", "50051")}')
     server.start()
     print(f"Product DB gRPC server started on port 50051 with raft node on {self_ip}")
     server.wait_for_termination()
