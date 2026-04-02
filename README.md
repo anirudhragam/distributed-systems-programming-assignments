@@ -437,7 +437,10 @@ Each customer-db replica runs a ABPNode instance with 5 concurrent threads:
 7. `submit_write` unblocks and returns the SQL result to the gRPC handler. If delivery does not complete within 30 seconds, the write times out the request is removed from `pending_requests` and `all_requests`, and an error is returned.
 
 ## Replication of Product Database with Raft
--
+The product-db cluster uses the PySyncObj library to implement Raft consensus. `RaftManager` extends PySyncObj's `SyncObj` class and is instantiated by `ProductDBServicer` to handle all replicated state.
 
+Each write operation in `ProductDBServicer` has a corresponding `@replicated` method on `RaftManager` (prefixed `sync_*`). When a write is requested, `ProductDBServicer` calls the corresponding `sync_*` method on its `RaftManager` instance. PySyncObj routes the call through Raft: the leader proposes the entry, waits for a majority of replicas to acknowledge it, then executes the write. Non-leader nodes reject write calls and redirect clients to the leader.
 
+`RaftManager` implements `getSnapshot` and `setSnapshot` to serialize and restore the full products table. When a new leader is elected or a lagging replica needs to catch up, PySyncObj calls `setSnapshot` to restore the database state from the snapshot before replaying any remaining log entries.
 
+Read operations are served directly from each replica's local PostgreSQL database without going through Raft, allowing all replicas to handle read traffic independently.
