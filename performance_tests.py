@@ -56,7 +56,7 @@ def run_seller_operations(seller_id: int):
 
         # Register items and update prices
         # Repeat these operations until approximately 1000 operations are done
-        for i in range((200 - 2) // 3): 
+        for i in range((1000 - 2) // 3): 
             # Register item for sale
             item_data = {
                 "item_name": f"Item_{seller_id}_{i}",
@@ -135,7 +135,7 @@ def run_buyer_operations(buyer_id: int):
 
         # Search items, get item, add to cart, remove from cart, save cart, display cart, clear cart, provide feedback, get seller rating
         # Repeat these operations until approximately 1000 operations are done
-        for i in range((200 - 2) // 6): 
+        for i in range((1000 - 2) // 6): 
             # Search items
             start = time.time()
             response = client.search_items(session, category=i % 5, keywords=["keyword1"])
