@@ -417,13 +417,26 @@ curl -s -X GET http://$BUYER:6000/api/buyers/purchases \
 
 # Programming Assignment 3
 
-## Design and Implementation a Rotating Sequencer Atomic Broadcast Protocol
--
+## Replication of Customer Database with Rotating Sequencer Atomic Broadcast Protocol
+The customer-db cluster uses a Rotating Sequencer Atomic Broadcast Protocol to ensure that all replicas execute write operations in the same total order. The protocol runs over UDP between all 5 nodes and ensures that every write is delivered to a majority before being committed.
 
-## Replication of Customer Database
--
+Each customer-db replica runs a ABPNode instance with 5 concurrent threads:
+  1. `recv_thread` : Listens on the UDP socket and dispatches every incoming message (REQUEST, SEQUENCE, STATUS, RETRANSMIT) to its handler
+  2. `sequencer_thread` : When it is this node's turn (k % n == node_id), picks the next pending request and broadcasts a SEQUENCE message assigning it a global sequence number.
+  3. `delivery_thread` : When it is this node's turn (k % n == node_id), picks the next pending request and broadcasts a SEQUENCE message assigning it a global sequence number.
+  4. `status_thread` - Broadcasts a STATUS heartbeat every 20ms so all nodes' peer_received_up_to values stay up to date.
+  5. `retransmit_thread` - Scans every 500ms for missing REQUESTs or SEQUENCE messages and sends a RETRANSMIT to the appropriate node to fill the gap.
 
-## Replication of Product Database
+### Write flow with RS-ABP
+1. A gRPC handler calls `submit_write(method, args)` on its local ABPNode.
+2. The node assigns a `request_id` =  `(node_id, local_seq)`, creates a threading.Event, and broadcasts a REQUEST message to all 5 peers.
+3. Every node's recv_thread receives the REQUEST and stores it in `all_requests` and `pending_requests`.
+4. The `sequencer_thread` on the designated sequencer node (determined by global_seq `k % n == node_id`) picks a candidate from pending_requests and broadcasts a SEQUENCE message assigning it global sequence number k.
+5. Every node's recv_thread receives the SEQUENCE and stores it in `sequences`.
+6. The `delivery_thread` continuously checks whether the next message to deliver (`next_to_deliver`) has both its REQUEST and SEQUENCE messages present and if a majority of nodes have `peer_received_up_to ≥ global_seq`. If majority condition is met, the delivery_thread executes the SQL.
+7. `submit_write` unblocks and returns the SQL result to the gRPC handler. If delivery does not complete within 30 seconds, the write times out the request is removed from `pending_requests` and `all_requests`, and an error is returned.
+
+## Replication of Product Database with Raft
 -
 
 
