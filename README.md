@@ -417,6 +417,13 @@ curl -s -X GET http://$BUYER:6000/api/buyers/purchases \
 
 # Programming Assignment 3
 
+## Deployment Setup
+
+![Deployment Setup](./images/vm_setup.png)
+
+Additionally, a test runner VM is deployed which is used to run test scripts and docker commands to run the experiments.
+
+
 ## Replication of Customer Database with Rotating Sequencer Atomic Broadcast Protocol
 The customer-db cluster uses a Rotating Sequencer Atomic Broadcast Protocol to ensure that all replicas execute write operations in the same total order. The protocol runs over UDP between all 5 nodes and ensures that every write is delivered to a majority before being committed.
 
