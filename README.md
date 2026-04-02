@@ -444,3 +444,6 @@ Each write operation in `ProductDBServicer` has a corresponding `@replicated` me
 `RaftManager` implements `getSnapshot` and `setSnapshot` to serialize and restore the full products table. When a new leader is elected or a lagging replica needs to catch up, PySyncObj calls `setSnapshot` to restore the database state from the snapshot before replaying any remaining log entries.
 
 Read operations are served directly from each replica's local PostgreSQL database without going through Raft, allowing all replicas to handle read traffic independently.
+
+# AI Use Disclosure
+We used AI for high-level system design planning and debugging edge cases.
