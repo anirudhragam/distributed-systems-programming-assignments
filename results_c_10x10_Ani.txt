@@ -1,0 +1,24 @@
+Iteration 1: Sellers - Avg Response Time: 560.02 ms, Throughput: 1.79 ops/sec
+Iteration 1: Buyers - Avg Response Time: 147.65 ms, Throughput: 6.77 ops/sec
+Iteration 2: Sellers - Avg Response Time: 583.04 ms, Throughput: 1.72 ops/sec
+Iteration 2: Buyers - Avg Response Time: 137.44 ms, Throughput: 7.28 ops/sec
+Iteration 3: Sellers - Avg Response Time: 541.43 ms, Throughput: 1.85 ops/sec
+Iteration 3: Buyers - Avg Response Time: 120.69 ms, Throughput: 8.29 ops/sec
+Iteration 4: Sellers - Avg Response Time: 600.64 ms, Throughput: 1.66 ops/sec
+Iteration 4: Buyers - Avg Response Time: 130.66 ms, Throughput: 7.65 ops/sec
+Iteration 5: Sellers - Avg Response Time: 580.71 ms, Throughput: 1.72 ops/sec
+Iteration 5: Buyers - Avg Response Time: 134.11 ms, Throughput: 7.46 ops/sec
+Iteration 6: Sellers - Avg Response Time: 575.79 ms, Throughput: 1.74 ops/sec
+Iteration 6: Buyers - Avg Response Time: 147.18 ms, Throughput: 6.79 ops/sec
+Iteration 7: Sellers - Avg Response Time: 591.02 ms, Throughput: 1.69 ops/sec
+Iteration 7: Buyers - Avg Response Time: 149.59 ms, Throughput: 6.69 ops/sec
+Iteration 8: Sellers - Avg Response Time: 576.63 ms, Throughput: 1.73 ops/sec
+Iteration 8: Buyers - Avg Response Time: 145.37 ms, Throughput: 6.88 ops/sec
+Iteration 9: Sellers - Avg Response Time: 594.11 ms, Throughput: 1.68 ops/sec
+Iteration 9: Buyers - Avg Response Time: 147.51 ms, Throughput: 6.78 ops/sec
+Iteration 10: Sellers - Avg Response Time: 526.11 ms, Throughput: 1.90 ops/sec
+Iteration 10: Buyers - Avg Response Time: 152.11 ms, Throughput: 6.57 ops/sec
+
+Final Results after 10 iterations:
+Sellers - Avg Response Time: 572.95 ms, Throughput: 1.75 ops/sec
+Buyers - Avg Response Time: 141.23 ms, Throughput: 7.12 ops/sec
