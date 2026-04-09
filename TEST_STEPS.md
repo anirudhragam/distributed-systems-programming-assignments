@@ -122,5 +122,6 @@ sleep 30
 # Running Seller and Buyer CLIs after deploying:
 SERVER_HOST=$(cd terraform && terraform output -raw vm1_external_ip) SERVER_PORT=5000 python services/seller_client/seller_cli.py
 
-SERVER_HOST=$(cd terraform && terraform output -raw vm1_external_ip) SERVER_PORT=5000 python services/seller_client/seller_cli.py
+SERVER_HOST=$(cd terraform && terraform output -raw vm1_external_ip) SERVER_PORT=6000 python services/buyer_client/buyer_cli.py
+
 
