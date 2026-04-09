@@ -118,3 +118,9 @@ bash /opt/app/restart_services.sh && python3 performance_tests.py --num-sellers 
 gcloud compute ssh vm1 --zone=$ZONE --command="sudo docker start product-db-0" -- -o StrictHostKeyChecking=no
 sleep 30
 ```
+
+# Running Seller and Buyer CLIs after deploying:
+SERVER_HOST=$(cd terraform && terraform output -raw vm1_external_ip) SERVER_PORT=5000 python services/seller_client/seller_cli.py
+
+SERVER_HOST=$(cd terraform && terraform output -raw vm1_external_ip) SERVER_PORT=5000 python services/seller_client/seller_cli.py
+
