@@ -434,6 +434,22 @@ Each customer-db replica runs a ABPNode instance with 5 concurrent threads:
   4. `status_thread` - Broadcasts a STATUS heartbeat every 20ms so all nodes' peer_received_up_to values stay up to date.
   5. `retransmit_thread` - Scans every 500ms for missing REQUESTs or SEQUENCE messages and sends a RETRANSMIT to the appropriate node to fill the gap.
 
+### Message formats
+  1. `REQUEST message` : Message confirming that a replica received a write. The node that received the write request broadcasts the REQUEST message to all other replicas. The REQUEST message contains the following fields:
+
+    `{ type, sender_id, local_seq, payload: {method, args}, received_up_to }`
+
+  2. `SEQUENCE message` : Designated sequencer for global sequence number k, picks a pending message to be sequenced from `pending_requests`, assigns it the global sequence number k and broadcasts the SEQUENCE message to the other replicas. The SEQUENCE message contains the following fields:
+
+    `{ type, global_seq, request_id: [sender_id, local_seq], sequencer_id, received_up_to }`
+
+  3. `STATUS message`: Periodic heartbeat containing only the `received_up_to` field to ensure progress even when there are no active write requests in-flight. The STATUS message contains the following fields:
+    `{ type, sender_id, received_up_to }`
+
+  4. `RETRANSMIT messgae`: Broadcasted by a node to indicate when it is either missing a REQUEST message or a SEQUENCE message for a particular globale sequence ID. The RETRANSMIT message contains the following fields:
+
+    `{ type, requester_id, target_id, retransmit_type: "REQUEST"|"SEQUENCE", request_id|global_seq }`
+
 ### Write flow with RS-ABP
 1. A gRPC handler calls `submit_write(method, args)` on its local ABPNode.
 2. The node assigns a `request_id` =  `(node_id, local_seq)`, creates a threading.Event, and broadcasts a REQUEST message to all 5 peers.
